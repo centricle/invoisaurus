@@ -13,7 +13,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR } from './config.js';
-import { formatInvoiceNumber, makeVendor, makeClient, makeInvoice, INVOICE_ID } from './schema.js';
+import {
+  formatInvoiceNumber, makeVendor, makeClient, makeInvoice, uniqueId, INVOICE_ID,
+} from './schema.js';
 
 const VENDORS = path.join(DATA_DIR, 'vendors.json');
 const CLIENTS = path.join(DATA_DIR, 'clients.json');
@@ -55,14 +57,33 @@ function writeJson(file, value) {
 export const listVendors = () => readJson(VENDORS, []);
 export const getVendor = (id) => listVendors().find((v) => v.id === id) || null;
 
-export function saveVendor(input) {
+/** Create a vendor and assign its id. See updateVendor for why this is split. */
+export function createVendor(input) {
+  const vendor = makeVendor({ ...input, id: uniqueId(input.name, takenVendorIds()) });
   const vendors = listVendors();
-  const vendor = makeVendor(input);
-  const i = vendors.findIndex((v) => v.id === vendor.id);
-  if (i === -1) vendors.push(vendor);
-  else vendors[i] = { ...vendors[i], ...vendor, nextNumber: vendors[i].nextNumber };
+  vendors.push(vendor);
   writeJson(VENDORS, vendors);
   return vendor;
+}
+
+/**
+ * Update a vendor in place. The id comes from the caller, never the form.
+ *
+ * `nextNumber` is the one field an edit can corrupt: moving it backward
+ * reissues a number already on a client's books. Callers should validate with
+ * `validateVendor(input, { existing })` for a readable error; the floor is
+ * enforced here regardless, so a missed check cannot produce a duplicate.
+ */
+export function updateVendor(id, input) {
+  const vendors = listVendors();
+  const i = vendors.findIndex((v) => v.id === id);
+  if (i === -1) throw new Error(`No vendor with id "${id}"`);
+  const vendor = makeVendor({ ...input, id });
+  vendor.nextNumber = Math.max(vendor.nextNumber, vendors[i].nextNumber);
+  vendor.createdAt = vendors[i].createdAt;
+  vendors[i] = { ...vendors[i], ...vendor };
+  writeJson(VENDORS, vendors);
+  return vendors[i];
 }
 
 /**
@@ -88,15 +109,48 @@ export function allocateInvoiceNumber(vendorId) {
 export const listClients = () => readJson(CLIENTS, []);
 export const getClient = (id) => listClients().find((c) => c.id === id) || null;
 
-export function saveClient(input) {
+/**
+ * Create a client and assign its id.
+ *
+ * The id is derived once, here, and never again. Everything downstream — every
+ * invoice's `clientId`, every bookmarked /clients/<id>/edit URL — depends on it
+ * outliving any number of renames.
+ */
+export function createClient(input) {
+  const client = makeClient({ ...input, id: uniqueId(input.displayName || input.name, takenClientIds()) });
   const clients = listClients();
-  const client = makeClient(input);
-  const i = clients.findIndex((c) => c.id === client.id);
-  if (i === -1) clients.push(client);
-  else clients[i] = { ...clients[i], ...client };
+  clients.push(client);
   writeJson(CLIENTS, clients);
   return client;
 }
+
+/**
+ * Update a client in place. The id is taken from the caller's `id` argument and
+ * never from the submitted fields.
+ *
+ * Create and update are separate functions rather than one save() because a
+ * single save() cannot tell an update from a create, and a caller who forgot to
+ * carry the id forward got a silently duplicated record with a fresh slug —
+ * leaving every existing invoice pointing at the original, now-orphaned copy.
+ * Update cannot invent an id, so that failure is no longer expressible.
+ */
+export function updateClient(id, input) {
+  const clients = listClients();
+  const i = clients.findIndex((c) => c.id === id);
+  if (i === -1) throw new Error(`No client with id "${id}"`);
+  clients[i] = { ...clients[i], ...makeClient({ ...input, id }), createdAt: clients[i].createdAt };
+  writeJson(CLIENTS, clients);
+  return clients[i];
+}
+
+/** Ids in use, for collision-free id assignment. */
+export const takenClientIds = () => listClients().map((c) => c.id);
+export const takenVendorIds = () => listVendors().map((v) => v.id);
+
+/** Invoices referencing a client, so the edit form can say how many are affected
+ *  and that the snapshot leaves them alone. */
+export const invoiceCountForClient = (clientId) =>
+  listInvoices().filter((inv) => inv.clientId === clientId).length;
 
 // --- Invoices --------------------------------------------------------------
 

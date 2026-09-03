@@ -1,0 +1,7 @@
+<% if (errors && errors.length) { %>
+  <div class="mb-6 rounded-md border border-red-900/60 bg-red-950/40 px-4 py-3">
+    <ul class="space-y-1 text-sm text-red-300">
+      <% errors.forEach((e) => { %><li><%= e %></li><% }) %>
+    </ul>
+  </div>
+<% } %>

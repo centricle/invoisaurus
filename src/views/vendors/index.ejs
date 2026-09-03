@@ -1,0 +1,36 @@
+<%- include('../partials/layout-head', { title: 'Vendors' }) %>
+
+<div class="mb-2 flex items-end justify-between">
+  <h1 class="text-2xl font-semibold tracking-tight text-slate-100">Vendors</h1>
+  <a href="/vendors/new" class="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500">New Vendor</a>
+</div>
+<p class="mb-8 text-sm text-slate-500">The entities that issue invoices. Each keeps its own number series.</p>
+
+<% if (!vendors.length) { %>
+  <div class="rounded-lg border border-dashed border-slate-800 px-6 py-16 text-center">
+    <p class="text-sm text-slate-400">No vendors yet.</p>
+  </div>
+<% } else { %>
+  <table class="w-full text-sm">
+    <thead class="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
+      <tr>
+        <th class="py-2 font-medium">Company</th>
+        <th class="py-2 font-medium">Email</th>
+        <th class="py-2 font-medium">Location</th>
+        <th class="py-2 text-right font-medium">Next number</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-900">
+      <% vendors.forEach((v) => { %>
+        <tr class="hover:bg-slate-900/50">
+          <td class="py-3"><a href="/vendors/<%= v.id %>/edit" class="text-sky-400 hover:underline"><%= v.name %></a></td>
+          <td class="py-3 text-slate-400"><%= v.email || '—' %></td>
+          <td class="py-3 text-slate-400"><%= [v.address.city, v.address.state].filter(Boolean).join(', ') || '—' %></td>
+          <td class="py-3 text-right font-mono text-slate-400"><%= formatInvoiceNumber(v, v.nextNumber) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>
+
+<%- include('../partials/layout-foot') %>

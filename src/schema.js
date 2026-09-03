@@ -170,3 +170,65 @@ export function validateInvoice(invoice) {
   });
   return errors;
 }
+
+/**
+ * Derive an id that is not already taken.
+ *
+ * Ids are foreign keys on invoice records, so a collision would silently give
+ * two clients the same billing history. Ids are assigned once at creation and
+ * never change afterward, because changing one orphans every invoice that
+ * points at it.
+ */
+export function uniqueId(base, takenIds) {
+  const root = slugify(base) || 'record';
+  if (!takenIds.includes(root)) return root;
+  for (let n = 2; ; n += 1) {
+    const candidate = `${root}-${n}`;
+    if (!takenIds.includes(candidate)) return candidate;
+  }
+}
+
+/**
+ * Id collisions are not checked here. An id is never submitted: it is derived
+ * once at creation by `uniqueId` against the ids already taken, and an update
+ * takes it as an argument rather than from the form. There is no path by which
+ * a caller can propose one, so there is nothing here to reject.
+ */
+export function validateClient(input) {
+  const errors = [];
+  if (!String(input.name || '').trim()) errors.push('Legal name is required — it renders on the invoice.');
+  if (!CLIENT_TYPES.includes(input.type)) errors.push('Type must be Business or Individual.');
+  return errors;
+}
+
+export function validateVendor(input, { existing = null, takenPrefixes = [] } = {}) {
+  const errors = [];
+  if (!String(input.name || '').trim()) errors.push('Company name is required.');
+
+  // The prefix is the leading half of every invoice id, and an invoice id is a
+  // filename and a URL segment. Two constraints follow. It must be filename
+  // safe, or a prefix of `../` writes records outside the data directory and a
+  // prefix containing `/` produces a record whose URL cannot match
+  // /invoices/:id -- unreachable and undeletable from the UI. And it must be
+  // present and unique, because two vendors sharing a prefix issue the same
+  // invoice id and the second one written replaces the first on disk.
+  const prefix = String(input.numberPrefix ?? '').trim();
+  if (!prefix) {
+    errors.push('Invoice prefix is required \u2014 it is what keeps two vendors\u2019 numbers apart.');
+  } else if (!NUMBER_PREFIX.test(prefix)) {
+    errors.push('Invoice prefix may use letters, digits, dot, underscore and hyphen only, up to 16 characters.');
+  } else if (takenPrefixes.includes(prefix)) {
+    errors.push(`Another vendor already issues ${prefix} numbers, and two vendors sharing a prefix would issue the same invoice id.`);
+  }
+
+  const pad = Number(input.numberPad);
+  if (!Number.isInteger(pad) || pad < 1 || pad > 10) errors.push('Number padding must be between 1 and 10.');
+  const next = Number(input.nextNumber);
+  if (!Number.isInteger(next) || next < 1) errors.push('Next invoice number must be a positive whole number.');
+  // Moving the counter backward would reissue a number that is already on a
+  // client's books. Gaps are fine; duplicates are an accounting problem.
+  if (existing && next < existing.nextNumber) {
+    errors.push(`Next invoice number cannot move backward from ${existing.nextNumber} — that would reuse a number already issued.`);
+  }
+  return errors;
+}

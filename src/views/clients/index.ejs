@@ -1,0 +1,39 @@
+<%- include('../partials/layout-head', { title: 'Clients' }) %>
+
+<div class="mb-8 flex items-end justify-between">
+  <h1 class="text-2xl font-semibold tracking-tight text-slate-100">Clients</h1>
+  <a href="/clients/new" class="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500">New Client</a>
+</div>
+
+<% if (!clients.length) { %>
+  <div class="rounded-lg border border-dashed border-slate-800 px-6 py-16 text-center">
+    <p class="text-sm text-slate-400">No clients yet.</p>
+  </div>
+<% } else { %>
+  <table class="w-full text-sm">
+    <thead class="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
+      <tr>
+        <th class="py-2 font-medium">Client</th>
+        <th class="py-2 font-medium">Legal name</th>
+        <th class="py-2 font-medium">Attn</th>
+        <th class="py-2 font-medium">Type</th>
+        <th class="py-2 text-right font-medium">Invoices</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-900">
+      <% clients.forEach((c) => { %>
+        <tr class="hover:bg-slate-900/50">
+          <td class="py-3">
+            <a href="/clients/<%= c.id %>/edit" class="text-sky-400 hover:underline"><%= clientLabel(c) %></a>
+          </td>
+          <td class="py-3 text-slate-400"><%= c.name %></td>
+          <td class="py-3 text-slate-400"><%= c.contactName || '—' %></td>
+          <td class="py-3 text-slate-400"><%= c.type %></td>
+          <td class="py-3 text-right font-mono text-slate-400"><%= c.invoiceCount %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>
+
+<%- include('../partials/layout-foot') %>

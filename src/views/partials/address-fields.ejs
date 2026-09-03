@@ -1,0 +1,9 @@
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+  <%- field('street', 'Street', address.street, { className: 'sm:col-span-2' }) %>
+  <%- field('street2', 'Street 2', address.street2, { className: 'sm:col-span-2', hint: 'Optional' }) %>
+  <%- field('city', 'City', address.city) %>
+  <div class="grid grid-cols-2 gap-4">
+    <%- field('state', 'State', address.state) %>
+    <%- field('zip', 'ZIP', address.zip) %>
+  </div>
+</div>

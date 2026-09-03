@@ -53,8 +53,9 @@ accounting problem.
 |---|---|---|
 | `INVOISAURUS_DATA_DIR` | `./data` | Where records are read and written |
 | `PORT` | `7054` | Port the server listens on |
+| `NODE_ENV` | unset | `production` enables template caching |
 
-Both are read at startup. To run against a different data directory on a
+All three are read at startup. To run against a different data directory on a
 different port:
 
 ```sh
@@ -83,7 +84,7 @@ Backing it up is up to you. Nothing about the app cares how, or whether.
 npm test
 ```
 
-12 tests on Node's built-in runner. No test dependencies, no config, no watch
+29 tests on Node's built-in runner. No test dependencies, no config, no watch
 mode to learn. They use temporary directories and never touch your data.
 
 `.github/workflows/test.yml` runs the same command on pushes to `main` and on
@@ -93,11 +94,12 @@ every pull request, against the Node version pinned in `.nvmrc`.
 
 | Path | Purpose |
 |---|---|
-| `server.js` | Express entry |
+| `server.js` | Express entry, mounts routes |
 | `src/config.js` | Resolves the data directory, port and project root |
 | `src/schema.js` | Record shapes and validation. The single definition of the data model. |
 | `src/store.js` | JSON read/write, atomic writes, invoice number allocation |
 | `src/money.js` | Integer-cent arithmetic and formatting |
+| `src/routes/` | One router each for clients and vendors |
 | `src/views/` | EJS templates |
 
 Express 5, EJS, Tailwind 4 via the CLI, pdf-lib. Line-item arithmetic is vanilla

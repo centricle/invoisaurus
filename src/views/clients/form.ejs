@@ -1,0 +1,42 @@
+<%- include('../partials/layout-head', { title: isNew ? 'New Client' : 'Edit Client' }) %>
+
+<h1 class="mb-8 text-2xl font-semibold tracking-tight text-slate-100">
+  <%= isNew ? 'New Client' : 'Edit Client' %>
+</h1>
+
+<%- include('../partials/errors') %>
+
+<% if (!isNew && invoiceCount > 0) { %>
+  <p class="mb-6 rounded-md border border-slate-800 bg-slate-900/60 px-4 py-3 text-xs text-slate-400">
+    <%= invoiceCount %> invoice<%= invoiceCount === 1 ? '' : 's' %> reference this client.
+    Editing these details will not alter them — each invoice froze its own copy of the
+    address when it was issued.
+  </p>
+<% } %>
+
+<form method="post" action="<%= isNew ? '/clients' : `/clients/${client.id}` %>" class="max-w-2xl space-y-6">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <%- field('name', 'Legal name', client.name, { className: 'sm:col-span-2', hint: 'Renders on the invoice.' }) %>
+    <%- field('displayName', 'Display name', client.displayName, { hint: 'Optional. Used in dropdowns only.' }) %>
+    <label class="block">
+      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Type</span>
+      <select name="type" class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+        <% CLIENT_TYPES.forEach((t) => { %>
+          <option value="<%= t %>" <%= client.type === t ? 'selected' : '' %>><%= t === 'business' ? 'Business' : 'Individual' %></option>
+        <% }) %>
+      </select>
+    </label>
+    <%- field('contactName', 'Primary contact', client.contactName, { className: 'sm:col-span-2', hint: 'Optional. Renders on the Attn: line.' }) %>
+  </div>
+
+  <%- include('../partials/address-fields', { address: client.address }) %>
+
+  <div class="flex items-center gap-3 pt-2">
+    <button type="submit" class="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500">
+      <%= isNew ? 'Create Client' : 'Save Changes' %>
+    </button>
+    <a href="/clients" class="text-sm text-slate-400 hover:text-slate-200">Cancel</a>
+  </div>
+</form>
+
+<%- include('../partials/layout-foot') %>

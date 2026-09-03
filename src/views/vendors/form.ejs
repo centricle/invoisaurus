@@ -1,0 +1,41 @@
+<%- include('../partials/layout-head', { title: isNew ? 'New Vendor' : 'Edit Vendor' }) %>
+
+<h1 class="mb-8 text-2xl font-semibold tracking-tight text-slate-100">
+  <%= isNew ? 'New Vendor' : 'Edit Vendor' %>
+</h1>
+
+<%- include('../partials/errors') %>
+
+<form method="post" action="<%= isNew ? '/vendors' : `/vendors/${vendor.id}` %>" class="max-w-2xl space-y-6">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <%- field('name', 'Company name', vendor.name, { className: 'sm:col-span-2' }) %>
+    <%- field('email', 'Email', vendor.email, { type: 'email', className: 'sm:col-span-2', hint: 'Renders on the invoice as the contact for billing questions.' }) %>
+  </div>
+
+  <%- include('../partials/address-fields', { address: vendor.address }) %>
+
+  <fieldset class="rounded-md border border-slate-800 p-4">
+    <legend class="px-2 text-xs font-medium uppercase tracking-wide text-slate-400">Invoice numbering</legend>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <%- field('numberPrefix', 'Prefix', vendor.numberPrefix, { placeholder: 'ACM-' }) %>
+      <%- field('numberPad', 'Digits', vendor.numberPad, { type: 'number' }) %>
+      <%- field('nextNumber', 'Next number', vendor.nextNumber, { type: 'number' }) %>
+    </div>
+    <p class="mt-3 text-xs text-slate-500">
+      Numbers are per-vendor, so two entities can both have a number 14 without colliding.
+      <% if (!isNew) { %>
+        The counter can move forward but never backward — going back would reissue a number
+        already on a client's books.
+      <% } %>
+    </p>
+  </fieldset>
+
+  <div class="flex items-center gap-3 pt-2">
+    <button type="submit" class="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500">
+      <%= isNew ? 'Create Vendor' : 'Save Changes' %>
+    </button>
+    <a href="/vendors" class="text-sm text-slate-400 hover:text-slate-200">Cancel</a>
+  </div>
+</form>
+
+<%- include('../partials/layout-foot') %>

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  dueDateFor, addDays, formatInvoiceNumber, makeVendor, makeClient, makeInvoice,
+  dueDateFor, addDays, formatInvoiceNumber, makeVendor, makeClient, makeInvoice, validateVendor,
   snapshotClient, invoiceTotals, validateInvoice, addressLines,
 } from '../src/schema.js';
 import { parseCents, parseQuantity } from '../src/money.js';
@@ -60,4 +60,39 @@ test('address lines omit empties instead of printing blank rows', () => {
     addressLines({ street: '1 Anvil Plaza', street2: '', city: 'Sedona', state: 'AZ', zip: '86336' }),
     ['1 Anvil Plaza', 'Sedona, AZ 86336'],
   );
+});
+
+const vendorForm = (overrides = {}) => ({
+  name: 'ACME Corporation', numberPrefix: 'ACM-', numberPad: 4, nextNumber: 1, ...overrides,
+});
+
+test('an invoice prefix has to be usable as a filename', () => {
+  // The prefix is the leading half of every invoice id, and an invoice id is a
+  // filename. A prefix of `../` wrote records outside the data directory; one
+  // containing `/` produced a record whose URL could not match /invoices/:id,
+  // leaving it unreachable and undeletable from the UI.
+  for (const bad of ['../../tmp/pwn-', '2026/', 'ACM/', "O'Neil-", 'a'.repeat(17), 'A B']) {
+    const errors = validateVendor(vendorForm({ numberPrefix: bad }));
+    assert.ok(errors.some((e) => e.includes('prefix')), `${JSON.stringify(bad)} must be rejected`);
+  }
+  for (const good of ['ACM-', 'AJX-', 'a', 'INV.', 'x_9-']) {
+    assert.deepEqual(validateVendor(vendorForm({ numberPrefix: good })), [], good);
+  }
+});
+
+test('an invoice prefix is required and unique across vendors', () => {
+  // Two vendors sharing a prefix issue the same invoice id, and the second one
+  // saved replaced the first on disk with no error and no warning.
+  assert.ok(validateVendor(vendorForm({ numberPrefix: '' }))[0].includes('required'));
+  assert.ok(validateVendor(vendorForm({ numberPrefix: '   ' }))[0].includes('required'));
+
+  const clash = validateVendor(vendorForm({ numberPrefix: 'ACM-' }), { takenPrefixes: ['ACM-'] });
+  assert.ok(clash.some((e) => e.includes('already issues')), clash.join(' / '));
+  assert.deepEqual(validateVendor(vendorForm({ numberPrefix: 'AJX-' }), { takenPrefixes: ['ACM-'] }), []);
+});
+
+test('two vendors cannot produce the same invoice id', () => {
+  const a = makeVendor({ name: 'A Co', numberPrefix: 'ACO-' });
+  const b = makeVendor({ name: 'B Co', numberPrefix: 'BCO-' });
+  assert.notEqual(formatInvoiceNumber(a, 1), formatInvoiceNumber(b, 1));
 });
