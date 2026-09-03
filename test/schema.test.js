@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   dueDateFor, addDays, formatInvoiceNumber, makeVendor, makeClient, makeInvoice, validateVendor,
-  snapshotClient, invoiceTotals, validateInvoice, addressLines,
+  snapshotClient, invoiceTotals, validateInvoice, addressLines, formatLongDate,
 } from '../src/schema.js';
 import { parseCents, parseQuantity } from '../src/money.js';
 
@@ -60,6 +60,14 @@ test('address lines omit empties instead of printing blank rows', () => {
     addressLines({ street: '1 Anvil Plaza', street2: '', city: 'Sedona', state: 'AZ', zip: '86336' }),
     ['1 Anvil Plaza', 'Sedona, AZ 86336'],
   );
+});
+
+test('long dates are built from the string, not a Date', () => {
+  // new Date('2026-01-01') is UTC midnight, which is Dec 31 in US timezones.
+  assert.equal(formatLongDate('2026-01-01'), 'January 1, 2026');
+  assert.equal(formatLongDate('2026-09-03'), 'September 3, 2026');
+  assert.equal(formatLongDate('2026-12-31'), 'December 31, 2026');
+  assert.equal(formatLongDate(''), '');
 });
 
 const vendorForm = (overrides = {}) => ({

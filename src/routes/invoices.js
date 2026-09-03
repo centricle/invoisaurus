@@ -8,6 +8,7 @@ import {
   dueDateFor, today, TERMS, INVOICE_STATUSES, withSnapshots, INVOICE_ID,
 } from '../schema.js';
 import { parseCents, parseQuantity } from '../money.js';
+import { generateInvoicePdf } from '../lib/pdf/generate.js';
 
 export const invoicesRouter = express.Router();
 
@@ -126,6 +127,27 @@ invoicesRouter.post('/', (req, res) => {
     vendor: getVendor(input.vendorId), client: getClient(input.clientId), force: true,
   }), { create: true });
   res.redirect(`/invoices/${invoice.id}`);
+});
+
+/**
+ * The PDF is the document. The editor previews it by pointing an iframe here
+ * rather than rendering a second, HTML approximation that could drift from what
+ * the client actually receives.
+ */
+invoicesRouter.get('/:id/pdf', async (req, res, next) => {
+  const invoice = getInvoice(req.params.id);
+  if (!invoice) return res.status(404).render('404', { what: 'Invoice' });
+  try {
+    const bytes = await generateInvoicePdf(invoice);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `${req.query.download == null ? 'inline' : 'attachment'}; filename="${invoice.id}.pdf"`,
+    );
+    res.end(Buffer.from(bytes));
+  } catch (err) {
+    next(err);
+  }
 });
 
 invoicesRouter.get('/:id', (req, res) => {

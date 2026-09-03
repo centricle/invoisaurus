@@ -97,7 +97,8 @@ test('an invoice id that is not filename-safe never reaches the store', async ()
   }
 });
 
-test('the delete route rejects the same ids', async () => {
+test('the PDF and delete routes reject the same ids', async () => {
+  assert.equal((await fetch(`${base}/invoices/%2e%2e%2fclients/pdf`)).status, 404);
   assert.equal((await post('/invoices/%2e%2e%2fclients/delete', {})).status, 404);
 });
 

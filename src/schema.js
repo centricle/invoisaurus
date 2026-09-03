@@ -270,3 +270,22 @@ export function withSnapshots(invoice, { vendor, client, force = false, storedSt
     billTo: client ? snapshotClient(client) : invoice.billTo,
   };
 }
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/**
+ * "2026-09-03" -> "September 3, 2026".
+ *
+ * Built from the string parts rather than a Date, because constructing a Date
+ * from an ISO date string parses it as UTC and formatting it in a western
+ * timezone lands on the previous day. An invoice date is a calendar fact.
+ */
+export function formatLongDate(isoDate) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(isoDate || ''));
+  if (!match) return String(isoDate || '');
+  const [, year, month, day] = match;
+  return `${MONTHS[Number(month) - 1]} ${Number(day)}, ${year}`;
+}

@@ -84,7 +84,7 @@ Backing it up is up to you. Nothing about the app cares how, or whether.
 npm test
 ```
 
-50 tests on Node's built-in runner. No test dependencies, no config, no watch
+65 tests on Node's built-in runner. No test dependencies, no config, no watch
 mode to learn. They use temporary directories and never touch your data.
 
 `test/routes.test.js` runs the real Express app against a temporary data
@@ -103,6 +103,7 @@ every pull request, against the Node version pinned in `.nvmrc`.
 | `src/schema.js` | Record shapes and validation. The single definition of the data model. |
 | `src/store.js` | JSON read/write, atomic writes, invoice number allocation |
 | `src/money.js` | Integer-cent arithmetic and formatting |
+| `src/lib/pdf/` | `layout.js` decides where things go, `generate.js` draws them |
 | `src/routes/` | One router each for invoices, clients, vendors |
 | `src/views/` | EJS templates |
 | `public/js/` | Browser-side behavior for the invoice editor |

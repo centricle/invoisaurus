@@ -13,8 +13,8 @@
   </div>
   <% if (!isNew) { %>
     <div class="flex items-center gap-3">
-      <a href="/invoices/<%= invoice.id %>/pdf" target="_blank"
-         class="rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:border-slate-500">PDF</a>
+      <a href="/invoices/<%= invoice.id %>/pdf?download=1"
+         class="rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:border-slate-500">Download PDF</a>
     </div>
   <% } %>
 </div>
@@ -181,6 +181,20 @@
     </td>
   </tr>
 </template>
+
+<% if (!isNew) { %>
+  <section class="mt-12">
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="text-sm font-medium uppercase tracking-wide text-slate-400">Preview</h2>
+      <a href="/invoices/<%= invoice.id %>/pdf" target="_blank"
+         class="text-xs text-slate-500 hover:text-slate-300">Open in new tab</a>
+    </div>
+    <!-- The preview is the real PDF, not a second HTML rendering of the same
+         data. There is nothing here that can drift from what the client gets. -->
+    <iframe src="/invoices/<%= invoice.id %>/pdf#toolbar=0" title="Invoice <%= invoice.id %>"
+            class="h-[900px] w-full rounded-lg border border-slate-800 bg-slate-900"></iframe>
+  </section>
+<% } %>
 
 <script src="/js/invoice-editor.js"></script>
 
