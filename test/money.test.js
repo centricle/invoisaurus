@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCents, parseQuantity, lineAmountCents, formatUSD, formatQuantity, sumCents } from '../src/money.js';
+import {
+  parseCents, parseQuantity, lineAmountCents, formatUSD, formatQuantity, sumCents,
+  quantityInputValue, centsInputValue,
+} from '../src/money.js';
 
 test('parseCents accepts the shapes a human types', () => {
   assert.equal(parseCents('150'), 15000);
@@ -40,4 +43,38 @@ test('formatting is the only place decimals appear', () => {
   assert.equal(formatUSD(-2500), '-$25.00');
   assert.equal(formatQuantity(12500), '12.5');
   assert.equal(formatQuantity(3000), '3');
+});
+
+test('input values are valid for an <input type="number">', () => {
+  // A number input silently blanks any value the HTML spec calls invalid, and
+  // "9,999" is invalid. This is the rule the browser applies, asserted directly.
+  for (const milli of [100, 12500, 999000, 1000000, 9999000, 123456789]) {
+    const value = quantityInputValue(milli);
+    assert.ok(!/[,\s$]/.test(value), `${milli} rendered as "${value}"`);
+    assert.ok(!Number.isNaN(Number(value)), `Number("${value}") is NaN`);
+  }
+});
+
+test('input values round-trip back to the same stored integer', () => {
+  // The failure was not just display: the blank field submitted as empty and
+  // wrote the quantity back as null, destroying it.
+  for (const milli of [100, 12500, 999000, 1000000, 9999000, 123456789]) {
+    assert.equal(parseQuantity(quantityInputValue(milli)), milli, `quantity ${milli}`);
+  }
+  for (const cents of [1, 200, 99999, 150000, 9999900, 123456789]) {
+    assert.equal(parseCents(centsInputValue(cents)), cents, `rate ${cents}`);
+  }
+});
+
+test('display formatting still groups thousands', () => {
+  // The grouped forms are still correct for pages and the PDF; they are simply
+  // not what goes into a form control.
+  assert.equal(formatQuantity(9999000), '9,999');
+  assert.equal(formatUSD(1999800), '$19,998.00');
+  assert.equal(quantityInputValue(9999000), '9999');
+});
+
+test('a null quantity or rate renders an empty field, not a zero', () => {
+  assert.equal(quantityInputValue(null), '');
+  assert.equal(centsInputValue(null), '');
 });

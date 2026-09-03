@@ -84,8 +84,12 @@ Backing it up is up to you. Nothing about the app cares how, or whether.
 npm test
 ```
 
-29 tests on Node's built-in runner. No test dependencies, no config, no watch
+50 tests on Node's built-in runner. No test dependencies, no config, no watch
 mode to learn. They use temporary directories and never touch your data.
+
+`test/routes.test.js` runs the real Express app against a temporary data
+directory on an ephemeral port, so the request handlers are covered too, not
+just the pure functions underneath them.
 
 `.github/workflows/test.yml` runs the same command on pushes to `main` and on
 every pull request, against the Node version pinned in `.nvmrc`.
@@ -99,8 +103,9 @@ every pull request, against the Node version pinned in `.nvmrc`.
 | `src/schema.js` | Record shapes and validation. The single definition of the data model. |
 | `src/store.js` | JSON read/write, atomic writes, invoice number allocation |
 | `src/money.js` | Integer-cent arithmetic and formatting |
-| `src/routes/` | One router each for clients and vendors |
+| `src/routes/` | One router each for invoices, clients, vendors |
 | `src/views/` | EJS templates |
+| `public/js/` | Browser-side behavior for the invoice editor |
 
 Express 5, EJS, Tailwind 4 via the CLI, pdf-lib. Line-item arithmetic is vanilla
 JS in the browser; everything else is a form POST. No bundler, no client

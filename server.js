@@ -3,15 +3,18 @@ import path from 'node:path';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { PORT, ROOT_DIR, DATA_DIR } from './src/config.js';
-import { ensureDataDir, listInvoices, listVendors, listClients } from './src/store.js';
-import { formatUSD, formatQuantity } from './src/money.js';
+import { ensureDataDir } from './src/store.js';
 import {
-  invoiceTotals, clientLabel, addressLines, termById, formatInvoiceNumber,
+  formatUSD, formatQuantity, formatCents, quantityInputValue, centsInputValue,
+} from './src/money.js';
+import {
+  clientLabel, addressLines, termById, dueDateFor, formatInvoiceNumber,
 } from './src/schema.js';
 import { field } from './src/viewHelpers.js';
 import { ejsEngine } from './src/viewEngine.js';
 import { clientsRouter } from './src/routes/clients.js';
 import { vendorsRouter } from './src/routes/vendors.js';
+import { invoicesRouter } from './src/routes/invoices.js';
 
 ensureDataDir();
 
@@ -31,20 +34,14 @@ app.use(express.static(path.join(ROOT_DIR, 'public')));
 // Helpers every view needs. Kept in one place so no template reimplements money
 // or invoice-number formatting and quietly disagrees with the PDF.
 Object.assign(app.locals, {
-  formatUSD, formatQuantity, clientLabel, addressLines, termById, formatInvoiceNumber,
+  formatUSD, formatQuantity, formatCents, quantityInputValue, centsInputValue,
+  clientLabel, addressLines, termById, dueDateFor, formatInvoiceNumber,
   field, dataDir: displayDataDir,
 });
 
-app.get('/', (req, res) => {
-  const clients = listClients();
-  const invoices = listInvoices().map((inv) => ({
-    ...inv,
-    totalCents: invoiceTotals(inv).totalCents,
-    client: clients.find((c) => c.id === inv.clientId) || null,
-  }));
-  res.render('invoices/index', { invoices, clients, vendors: listVendors() });
-});
+app.get('/', (req, res) => res.redirect('/invoices'));
 
+app.use('/invoices', invoicesRouter);
 app.use('/clients', clientsRouter);
 app.use('/vendors', vendorsRouter);
 

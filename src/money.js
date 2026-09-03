@@ -87,3 +87,30 @@ export const formatUSD = (cents) => (cents == null ? '' : `${cents < 0 ? '-' : '
 export const formatQuantity = (milli) => formatScaled(milli, MILLI, { trimZeros: true });
 
 export const sumCents = (values) => values.reduce((total, n) => total + (n || 0), 0);
+
+/**
+ * Values destined for a form field, never for display.
+ *
+ * `formatCents`/`formatQuantity` group thousands with commas, which is right on
+ * a page and wrong in an input. An `<input type="number">` treats "9,999" as
+ * invalid and renders it as *blank* — no error, no warning — and submitting
+ * that blank field writes the value back as null. A grouped separator in a form
+ * control is therefore a data-loss bug, not a cosmetic one.
+ *
+ * Anything placed in a form control goes through these.
+ */
+const unformatted = (value, scale) => {
+  if (value == null) return '';
+  const negative = value < 0;
+  const abs = Math.abs(value);
+  const digits = String(scale).length - 1;
+  const frac = String(abs % scale).padStart(digits, '0');
+  return `${negative ? '-' : ''}${Math.floor(abs / scale)}.${frac}`;
+};
+
+/** "9999000" -> "9999" (no separators, no trailing zeros). */
+export const quantityInputValue = (milli) =>
+  (milli == null ? '' : unformatted(milli, 1000).replace(/\.?0+$/, ''));
+
+/** "150000" -> "1500.00" (no separators). */
+export const centsInputValue = (cents) => unformatted(cents, 100);

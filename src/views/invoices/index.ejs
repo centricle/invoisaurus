@@ -1,20 +1,44 @@
 <%- include('../partials/layout-head', { title: 'Invoices' }) %>
 
-<div class="mb-8 flex items-end justify-between">
+<div class="mb-6 flex items-end justify-between">
   <h1 class="text-2xl font-semibold tracking-tight text-slate-100">Invoices</h1>
-  <a href="/invoices/new"
-     class="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500">
-    New Invoice
-  </a>
+  <a href="/invoices/new" class="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500">New Invoice</a>
 </div>
+
+<% if (invoices.length || clientFilter || statusFilter) { %>
+  <form method="get" action="/invoices" class="mb-8 flex flex-wrap items-end gap-3">
+    <label class="block">
+      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Client</span>
+      <select name="client" class="rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-200 focus:border-sky-600 focus:outline-none">
+        <option value="">All clients</option>
+        <% clients.forEach((c) => { %>
+          <option value="<%= c.id %>" <%= clientFilter === c.id ? 'selected' : '' %>><%= clientLabel(c) %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label class="block">
+      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Status</span>
+      <select name="status" class="rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-200 focus:border-sky-600 focus:outline-none">
+        <option value="">Any status</option>
+        <% INVOICE_STATUSES.forEach((s) => { %>
+          <option value="<%= s %>" <%= statusFilter === s ? 'selected' : '' %>><%= s %></option>
+        <% }) %>
+      </select>
+    </label>
+    <button type="submit" class="rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500">Filter</button>
+    <% if (clientFilter || statusFilter) { %>
+      <a href="/invoices" class="py-2 text-sm text-slate-500 hover:text-slate-300">Clear</a>
+    <% } %>
+  </form>
+<% } %>
 
 <% if (!invoices.length) { %>
   <div class="rounded-lg border border-dashed border-slate-800 px-6 py-16 text-center">
-    <p class="text-sm text-slate-400">No invoices yet.</p>
+    <p class="text-sm text-slate-400">
+      <%= clientFilter || statusFilter ? 'No invoices match that filter.' : 'No invoices yet.' %>
+    </p>
     <% if (!clients.length) { %>
-      <p class="mt-2 text-sm text-slate-500">
-        Add a <a href="/clients/new" class="text-sky-400 underline">client</a> first.
-      </p>
+      <a href="/clients/new" class="mt-3 inline-block text-sm text-sky-400 hover:underline">Add a client first</a>
     <% } %>
   </div>
 <% } else { %>
@@ -35,7 +59,7 @@
           <td class="py-3 font-mono">
             <a href="/invoices/<%= inv.id %>" class="text-sky-400 hover:underline"><%= inv.id %></a>
           </td>
-          <td class="py-3"><%= inv.client ? clientLabel(inv.client) : inv.billTo?.name || '—' %></td>
+          <td class="py-3"><%= inv.client ? clientLabel(inv.client) : (inv.billTo ? inv.billTo.name : '—') %></td>
           <td class="py-3 text-slate-400"><%= inv.issueDate %></td>
           <td class="py-3 text-slate-400"><%= inv.dueDate %></td>
           <td class="py-3 text-slate-400"><%= inv.status %></td>

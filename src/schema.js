@@ -157,10 +157,19 @@ export function invoiceTotals(invoice) {
   return { amounts, totalCents: sumCents(amounts) };
 }
 
-export function validateInvoice(invoice) {
+/**
+ * @param refs  The vendor and client the ids resolve to, or null when they do
+ *              not resolve. A non-empty id is not the same as a real record:
+ *              an invoice pointing at a deleted or misspelled client would save
+ *              happily and render a PDF with an empty Bill To block.
+ */
+export function validateInvoice(invoice, refs = {}) {
+  const { vendor, client } = refs;
   const errors = [];
   if (!invoice.vendorId) errors.push('A vendor is required.');
+  else if ('vendor' in refs && !vendor) errors.push(`No vendor with id "${invoice.vendorId}".`);
   if (!invoice.clientId) errors.push('A client is required.');
+  else if ('client' in refs && !client) errors.push(`No client with id "${invoice.clientId}".`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(invoice.issueDate)) errors.push('Invoice date must be YYYY-MM-DD.');
   if (!invoice.lineItems.length) errors.push('An invoice needs at least one line item.');
   invoice.lineItems.forEach((li, i) => {
@@ -231,4 +240,33 @@ export function validateVendor(input, { existing = null, takenPrefixes = [] } = 
     errors.push(`Next invoice number cannot move backward from ${existing.nextNumber} — that would reuse a number already issued.`);
   }
   return errors;
+}
+
+/**
+ * Apply the snapshot freeze policy.
+ *
+ * A draft still tracks the registry, so correcting a client's address before
+ * sending does what you expect. Once an invoice leaves draft it has been seen
+ * by someone else, and its snapshot stops moving: the document must keep saying
+ * what it said when it was sent.
+ *
+ * `force` is for the moment of creation, when there is no prior snapshot to
+ * preserve regardless of the status the record was created with.
+ *
+ * `storedStatus` is the status the record had *before* this save. The freeze
+ * has to be decided on that, not on the status being submitted: the save that
+ * sends an invoice arrives with status already `sent`, so reading the incoming
+ * value freezes one save too early and preserves the snapshot from the last
+ * draft rather than the details the invoice is being sent with. Callers that
+ * have not read the stored record fall back to the incoming status.
+ */
+export function withSnapshots(invoice, { vendor, client, force = false, storedStatus = null } = {}) {
+  const status = storedStatus ?? invoice.status;
+  const frozen = status !== 'draft' && invoice.billTo && invoice.remitFrom;
+  if (frozen && !force) return invoice;
+  return {
+    ...invoice,
+    remitFrom: vendor ? snapshotVendor(vendor) : invoice.remitFrom,
+    billTo: client ? snapshotClient(client) : invoice.billTo,
+  };
 }

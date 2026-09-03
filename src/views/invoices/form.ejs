@@ -1,0 +1,187 @@
+<% const termDays = Object.fromEntries(TERMS.map((t) => [t.id, t.days])); %>
+<%- include('../partials/layout-head', { title: isNew ? 'New Invoice' : invoice.id }) %>
+
+<div class="mb-8 flex items-start justify-between">
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight text-slate-100">
+      <%= isNew ? 'New Invoice' : invoice.id %>
+    </h1>
+    <p class="mt-1 text-sm text-slate-500">
+      <%= invoice.billTo ? invoice.billTo.name : 'Unknown client' %>
+      <% if (!isNew) { %> · <%= invoice.status %><% } %>
+    </p>
+  </div>
+  <% if (!isNew) { %>
+    <div class="flex items-center gap-3">
+      <a href="/invoices/<%= invoice.id %>/pdf" target="_blank"
+         class="rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:border-slate-500">PDF</a>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/errors') %>
+
+<form method="post" data-invoice-form
+      data-term-days='<%- JSON.stringify(termDays) %>'
+      action="<%= isNew ? '/invoices' : `/invoices/${invoice.id}` %>" class="space-y-8">
+
+  <input type="hidden" name="clientId" value="<%= invoice.clientId %>">
+
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+    <label class="block">
+      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Issued by</span>
+      <%# The vendor is choosable only while the invoice is being created. Its
+          number already came out of this vendor's series and its remit-from
+          block is already snapshotted, so switching it afterward would leave
+          the document and the record describing different companies. The
+          server ignores a submitted vendorId on an existing invoice; this
+          keeps the page from offering a control that does nothing. %>
+      <% if (isNew) { %>
+        <select name="vendorId" class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+          <% vendors.forEach((v) => { %>
+            <option value="<%= v.id %>" <%= invoice.vendorId === v.id ? 'selected' : '' %>><%= v.name %></option>
+          <% }) %>
+        </select>
+      <% } else { %>
+        <p class="rounded-md border border-slate-800/60 bg-slate-900/40 px-3 py-2 text-sm text-slate-400">
+          <%= (vendors.find((v) => v.id === invoice.vendorId) || {}).name || invoice.vendorId %>
+        </p>
+      <% } %>
+    </label>
+    <%- field('issueDate', 'Invoice date', invoice.issueDate, { type: 'date' }) %>
+    <label class="block">
+      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Terms</span>
+      <select name="terms" class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+        <% TERMS.forEach((t) => { %>
+          <option value="<%= t.id %>" <%= invoice.terms === t.id ? 'selected' : '' %>><%= t.label %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label class="block">
+      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Payment due</span>
+      <input type="date" name="dueDate" value="<%= invoice.dueDate %>"
+             data-overridden="<%= invoice.dueDate !== dueDateFor(invoice.issueDate, invoice.terms) %>"
+             class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+      <p class="mt-1 text-xs text-slate-500">Follows terms until you change it.</p>
+    </label>
+  </div>
+
+  <div>
+    <table class="w-full text-sm">
+      <thead class="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
+        <tr>
+          <th class="py-2 font-medium">Description</th>
+          <th class="w-28 py-2 font-medium">Qty</th>
+          <th class="w-32 py-2 font-medium">Rate</th>
+          <th class="w-32 py-2 text-right font-medium">Amount</th>
+          <th class="w-10 py-2"></th>
+        </tr>
+      </thead>
+      <tbody data-line-items class="divide-y divide-slate-900">
+        <% invoice.lineItems.forEach((li, i) => { %>
+          <tr data-line-item>
+            <td class="py-2 pr-3">
+              <input type="text" name="description[]" value="<%= li.description %>"
+                     class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+            </td>
+            <td class="py-2 pr-3">
+              <input type="text" name="quantity[]" inputmode="decimal" value="<%= quantityInputValue(li.quantityMilli) %>"
+                     class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-right text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+            </td>
+            <td class="py-2 pr-3">
+              <input type="text" name="rate[]" inputmode="decimal" value="<%= centsInputValue(li.rateCents) %>"
+                     class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-right text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+            </td>
+            <td class="py-2 text-right font-mono text-slate-300" data-amount>
+              <%= totals.amounts[i] ? formatUSD(totals.amounts[i]) : '—' %>
+            </td>
+            <td class="py-2 text-right">
+              <button type="button" data-remove title="Remove line"
+                      class="rounded px-2 py-1 text-slate-600 hover:text-red-400 disabled:opacity-30 disabled:hover:text-slate-600">&times;</button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" class="pt-4">
+            <button type="button" data-add-row
+                    class="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:border-slate-500">
+              Add line
+            </button>
+          </td>
+          <td class="pt-4 text-right">
+            <div class="text-xs uppercase tracking-wide text-slate-500">Amount due</div>
+            <div class="font-mono text-lg text-slate-100" data-total><%= formatUSD(totals.totalCents) %></div>
+          </td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <label class="block max-w-2xl">
+    <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Notes</span>
+    <textarea name="notes" rows="3"
+              class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none"><%= invoice.notes %></textarea>
+    <p class="mt-1 text-xs text-slate-500">Optional. Prints at the bottom of the invoice.</p>
+  </label>
+
+  <div class="flex items-center gap-3 border-t border-slate-900 pt-6">
+    <button type="submit" class="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500">
+      <%= isNew ? 'Create Invoice' : 'Save Changes' %>
+    </button>
+    <a href="/invoices" class="text-sm text-slate-400 hover:text-slate-200">Cancel</a>
+    <% if (!isNew) { %>
+      <span class="flex-1"></span>
+      <label class="text-xs uppercase tracking-wide text-slate-500">
+        Status
+        <select name="status" class="ml-2 rounded-md border border-slate-800 bg-slate-900 px-2 py-1 text-xs text-slate-200 focus:border-sky-600 focus:outline-none">
+          <% INVOICE_STATUSES.forEach((s) => { %>
+            <option value="<%= s %>" <%= invoice.status === s ? 'selected' : '' %>><%= s %></option>
+          <% }) %>
+        </select>
+      </label>
+    <% } %>
+  </div>
+</form>
+
+<% if (!isNew) { %>
+  <%# The id is carried as data and never interpolated into a script. EJS
+      escapes for HTML, but the browser decodes those entities back before the
+      JS parser runs, so a quote in an id would close a string literal in an
+      inline handler and the form would submit with no confirmation at all.
+      Validation keeps quotes out of ids; this keeps the page correct without
+      relying on it. invoice-editor.js binds the handler. %>
+  <form method="post" action="/invoices/<%= invoice.id %>/delete" class="mt-10"
+        data-delete-invoice="<%= invoice.id %>">
+    <button type="submit" class="text-xs text-slate-600 hover:text-red-400">Delete this invoice</button>
+  </form>
+<% } %>
+
+
+<template id="line-item-template">
+  <tr data-line-item>
+    <td class="py-2 pr-3">
+      <input type="text" name="description[]"
+             class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+    </td>
+    <td class="py-2 pr-3">
+      <input type="text" name="quantity[]" inputmode="decimal"
+             class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-right text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+    </td>
+    <td class="py-2 pr-3">
+      <input type="text" name="rate[]" inputmode="decimal"
+             class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-right text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+    </td>
+    <td class="py-2 text-right font-mono text-slate-300" data-amount>—</td>
+    <td class="py-2 text-right">
+      <button type="button" data-remove title="Remove line"
+              class="rounded px-2 py-1 text-slate-600 hover:text-red-400 disabled:opacity-30 disabled:hover:text-slate-600">&times;</button>
+    </td>
+  </tr>
+</template>
+
+<script src="/js/invoice-editor.js"></script>
+
+<%- include('../partials/layout-foot') %>
