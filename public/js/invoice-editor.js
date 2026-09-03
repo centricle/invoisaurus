@@ -126,6 +126,10 @@
  * quote in the id would end the string early. Invoice ids cannot contain one
  * today -- NUMBER_PREFIX and INVOICE_ID in src/schema.js both exclude quotes --
  * which is exactly why this should not depend on that staying true.
+ *
+ * Registered before the unsaved-changes guard below, so canceling here stops
+ * that guard from ever seeing the submit and concluding the page is on its way
+ * out.
  */
 (() => {
   const form = document.querySelector('[data-delete-invoice]');
@@ -136,5 +140,34 @@
     if (confirm(`Delete ${id}? The number will not be reused.`)) return;
     e.preventDefault();
     e.stopImmediatePropagation();
+  });
+})();
+
+/**
+ * Warn before navigating away from unsaved edits.
+ *
+ * Losing a half-built invoice to a stray click on the nav is the most annoying
+ * failure this app can have, and the editor has no autosave to fall back on.
+ * The snapshot is taken once the form has been parsed, so a server-rendered
+ * value never counts as a change; submitting clears the guard so saving does
+ * not trigger it.
+ */
+(() => {
+  const form = document.querySelector('[data-invoice-form]');
+  if (!form) return;
+
+  const snapshot = () => new URLSearchParams(new FormData(form)).toString();
+  let saved = snapshot();
+  let submitting = false;
+
+  form.addEventListener('submit', () => { submitting = true; });
+  document.querySelectorAll('form').forEach((f) => {
+    if (f !== form) f.addEventListener('submit', () => { submitting = true; });
+  });
+
+  window.addEventListener('beforeunload', (e) => {
+    if (submitting || snapshot() === saved) return;
+    e.preventDefault();
+    e.returnValue = '';
   });
 })();
