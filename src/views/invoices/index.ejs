@@ -1,0 +1,49 @@
+<%- include('../partials/layout-head', { title: 'Invoices' }) %>
+
+<div class="mb-8 flex items-end justify-between">
+  <h1 class="text-2xl font-semibold tracking-tight text-slate-100">Invoices</h1>
+  <a href="/invoices/new"
+     class="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500">
+    New Invoice
+  </a>
+</div>
+
+<% if (!invoices.length) { %>
+  <div class="rounded-lg border border-dashed border-slate-800 px-6 py-16 text-center">
+    <p class="text-sm text-slate-400">No invoices yet.</p>
+    <% if (!clients.length) { %>
+      <p class="mt-2 text-sm text-slate-500">
+        Add a <a href="/clients/new" class="text-sky-400 underline">client</a> first.
+      </p>
+    <% } %>
+  </div>
+<% } else { %>
+  <table class="w-full text-sm">
+    <thead class="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
+      <tr>
+        <th class="py-2 font-medium">Number</th>
+        <th class="py-2 font-medium">Client</th>
+        <th class="py-2 font-medium">Issued</th>
+        <th class="py-2 font-medium">Due</th>
+        <th class="py-2 font-medium">Status</th>
+        <th class="py-2 text-right font-medium">Amount</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-900">
+      <% invoices.forEach((inv) => { %>
+        <tr class="hover:bg-slate-900/50">
+          <td class="py-3 font-mono">
+            <a href="/invoices/<%= inv.id %>" class="text-sky-400 hover:underline"><%= inv.id %></a>
+          </td>
+          <td class="py-3"><%= inv.client ? clientLabel(inv.client) : inv.billTo?.name || '—' %></td>
+          <td class="py-3 text-slate-400"><%= inv.issueDate %></td>
+          <td class="py-3 text-slate-400"><%= inv.dueDate %></td>
+          <td class="py-3 text-slate-400"><%= inv.status %></td>
+          <td class="py-3 text-right font-mono"><%= formatUSD(inv.totalCents) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>
+
+<%- include('../partials/layout-foot') %>

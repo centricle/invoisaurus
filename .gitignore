@@ -1,0 +1,8 @@
+# Invoice records live outside this repository. See README.
+data/
+
+# Tailwind build output
+public/css/dist/
+
+node_modules/
+.DS_Store

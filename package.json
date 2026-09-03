@@ -1,0 +1,38 @@
+{
+  "name": "invoisaurus",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local invoice generator. Web UI in, PDF out.",
+  "scripts": {
+    "dev": "npm run css:build && node --watch server.js",
+    "start": "npm run css:build && node server.js",
+    "css": "npx @tailwindcss/cli -i public/css/app.css -o public/css/dist/app.css --watch",
+    "css:build": "npx @tailwindcss/cli -i public/css/app.css -o public/css/dist/app.css --minify",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "ejs": "^3.1.10",
+    "express": "^5.1.0",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.18"
+  },
+  "license": "MIT",
+  "author": "Kevin Smith <ksmith@centricle.com> (https://centricle.com)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/centricle/invoisaurus.git"
+  },
+  "keywords": [
+    "invoice",
+    "invoicing",
+    "pdf",
+    "pdf-lib",
+    "express",
+    "self-hosted",
+    "local-first"
+  ],
+  "engines": { "node": ">=22" }
+}
