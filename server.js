@@ -11,7 +11,7 @@ import {
   clientLabel, addressLines, termById, dueDateFor, isOverdue, daysOverdue,
   formatInvoiceNumber,
 } from './src/schema.js';
-import { field } from './src/viewHelpers.js';
+import { field, statusBadgeClass } from './src/viewHelpers.js';
 import { ejsEngine } from './src/viewEngine.js';
 import { takeFlash } from './src/flash.js';
 import { clientsRouter } from './src/routes/clients.js';
@@ -38,7 +38,7 @@ app.use(express.static(path.join(ROOT_DIR, 'public')));
 Object.assign(app.locals, {
   formatUSD, formatQuantity, formatCents, quantityInputValue, centsInputValue,
   clientLabel, addressLines, termById, dueDateFor, formatInvoiceNumber,
-  isOverdue, daysOverdue, field, dataDir: displayDataDir,
+  isOverdue, daysOverdue, field, statusBadgeClass, dataDir: displayDataDir,
 });
 
 // A confirmation belongs to one moment, so it is read and cleared here rather

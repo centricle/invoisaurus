@@ -36,3 +36,22 @@ export function field(name, label, value, opts = {}) {
 }
 
 export { escapeHtml };
+
+/**
+ * Badge styling per invoice status.
+ *
+ * Colors track meaning rather than decoration: draft is neutral because nothing
+ * has happened yet, sent is live, paid is settled, and void is struck through
+ * and dimmed because the record exists only so its number is not reused.
+ *
+ * Full class strings, never interpolated fragments — Tailwind scans source
+ * text, so a class assembled at runtime is a class it never generates.
+ */
+const STATUS_BADGE = {
+  draft: 'border-slate-700 bg-slate-800/70 text-slate-300',
+  sent: 'border-sky-800 bg-sky-950/70 text-sky-300',
+  paid: 'border-emerald-800 bg-emerald-950/70 text-emerald-300',
+  void: 'border-slate-800 bg-slate-900/70 text-slate-500 line-through',
+};
+
+export const statusBadgeClass = (status) => STATUS_BADGE[status] || STATUS_BADGE.draft;

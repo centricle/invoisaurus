@@ -67,8 +67,10 @@
               <span class="ml-1 text-xs">· <%= daysOverdue(inv) %>d late</span>
             <% } %>
           </td>
-          <td class="py-3 text-slate-400"><%= inv.status %></td>
-          <td class="py-3 text-right font-mono"><%= formatUSD(inv.totalCents) %></td>
+          <td class="py-3">
+            <span class="rounded-full border px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-widest <%= statusBadgeClass(inv.status) %>"><%= inv.status %></span>
+          </td>
+          <td class="py-3 text-right font-mono <%= inv.status === 'sent' ? 'text-slate-100' : 'text-slate-600' %>"><%= formatUSD(inv.totalCents) %></td>
         </tr>
       <% }) %>
     </tbody>
@@ -78,7 +80,7 @@
           <%= invoices.length %> invoice<%= invoices.length === 1 ? '' : 's' %><% if (overdueCount) { %><span class="text-amber-400"> · <%= overdueCount %> overdue</span><% } %>
         </td>
         <td class="pt-3 text-right text-xs uppercase tracking-wide text-slate-500">Outstanding</td>
-        <td class="pt-3 text-right font-mono text-slate-200"><%= formatUSD(outstandingCents) %></td>
+        <td class="pt-3 text-right font-mono text-slate-100"><%= formatUSD(outstandingCents) %></td>
       </tr>
     </tfoot>
   </table>
