@@ -43,8 +43,10 @@ Object.assign(app.locals, {
 
 // A confirmation belongs to one moment, so it is read and cleared here rather
 // than left in the URL where a refresh or a bookmark would show it again.
-// See src/flash.js.
+// See src/flash.js. `currentPath` rides along because nav highlighting is the
+// same kind of thing: per-request state a template needs and cannot derive.
 app.use((req, res, next) => {
+  res.locals.currentPath = req.path;
   res.locals.flash = takeFlash(req, res);
   next();
 });
