@@ -8,7 +8,8 @@ import {
   formatUSD, formatQuantity, formatCents, quantityInputValue, centsInputValue,
 } from './src/money.js';
 import {
-  clientLabel, addressLines, termById, dueDateFor, formatInvoiceNumber,
+  clientLabel, addressLines, termById, dueDateFor, isOverdue, daysOverdue,
+  formatInvoiceNumber,
 } from './src/schema.js';
 import { field } from './src/viewHelpers.js';
 import { ejsEngine } from './src/viewEngine.js';
@@ -36,7 +37,7 @@ app.use(express.static(path.join(ROOT_DIR, 'public')));
 Object.assign(app.locals, {
   formatUSD, formatQuantity, formatCents, quantityInputValue, centsInputValue,
   clientLabel, addressLines, termById, dueDateFor, formatInvoiceNumber,
-  field, dataDir: displayDataDir,
+  isOverdue, daysOverdue, field, dataDir: displayDataDir,
 });
 
 app.get('/', (req, res) => res.redirect('/invoices'));

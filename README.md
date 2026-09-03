@@ -84,7 +84,7 @@ Backing it up is up to you. Nothing about the app cares how, or whether.
 npm test
 ```
 
-65 tests on Node's built-in runner. No test dependencies, no config, no watch
+68 tests on Node's built-in runner. No test dependencies, no config, no watch
 mode to learn. They use temporary directories and never touch your data.
 
 `test/routes.test.js` runs the real Express app against a temporary data

@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   dueDateFor, addDays, formatInvoiceNumber, makeVendor, makeClient, makeInvoice, validateVendor,
-  snapshotClient, invoiceTotals, validateInvoice, addressLines, formatLongDate,
+  snapshotClient, invoiceTotals, validateInvoice, addressLines, isOverdue, daysOverdue,
+  formatLongDate,
 } from '../src/schema.js';
 import { parseCents, parseQuantity } from '../src/money.js';
 
@@ -60,6 +61,32 @@ test('address lines omit empties instead of printing blank rows', () => {
     addressLines({ street: '1 Anvil Plaza', street2: '', city: 'Sedona', state: 'AZ', zip: '86336' }),
     ['1 Anvil Plaza', 'Sedona, AZ 86336'],
   );
+});
+
+test('only a sent invoice can be overdue', () => {
+  const past = { dueDate: '2026-08-01' };
+  assert.equal(isOverdue({ ...past, status: 'sent' }, '2026-09-03'), true);
+  assert.equal(isOverdue({ ...past, status: 'draft' }, '2026-09-03'), false);
+  assert.equal(isOverdue({ ...past, status: 'paid' }, '2026-09-03'), false);
+  assert.equal(isOverdue({ ...past, status: 'void' }, '2026-09-03'), false);
+});
+
+test('an invoice is not overdue on its due date', () => {
+  assert.equal(isOverdue({ status: 'sent', dueDate: '2026-09-03' }, '2026-09-03'), false);
+  assert.equal(daysOverdue({ dueDate: '2026-09-01' }, '2026-09-03'), 2);
+});
+
+test('isOverdue is safe to use as a filter predicate', () => {
+  // Array.filter passes (element, index, array). Passing isOverdue by
+  // reference put the index into `asOf`, so every date compared against a
+  // number and the overdue count was always zero — while the same function
+  // called with one argument elsewhere reported correctly.
+  const invoices = [
+    { status: 'sent', dueDate: '2026-07-15' },
+    { status: 'sent', dueDate: '2026-08-01' },
+    { status: 'draft', dueDate: '2026-07-01' },
+  ];
+  assert.equal(invoices.filter((inv) => isOverdue(inv, '2026-09-03')).length, 2);
 });
 
 test('long dates are built from the string, not a Date', () => {

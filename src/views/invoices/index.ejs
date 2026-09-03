@@ -61,12 +61,26 @@
           </td>
           <td class="py-3"><%= inv.client ? clientLabel(inv.client) : (inv.billTo ? inv.billTo.name : '—') %></td>
           <td class="py-3 text-slate-400"><%= inv.issueDate %></td>
-          <td class="py-3 text-slate-400"><%= inv.dueDate %></td>
+          <td class="py-3 <%= isOverdue(inv) ? 'text-amber-400' : 'text-slate-400' %>">
+            <%= inv.dueDate %>
+            <% if (isOverdue(inv)) { %>
+              <span class="ml-1 text-xs">· <%= daysOverdue(inv) %>d late</span>
+            <% } %>
+          </td>
           <td class="py-3 text-slate-400"><%= inv.status %></td>
           <td class="py-3 text-right font-mono"><%= formatUSD(inv.totalCents) %></td>
         </tr>
       <% }) %>
     </tbody>
+    <tfoot>
+      <tr class="border-t border-slate-800">
+        <td colspan="4" class="pt-3 text-xs uppercase tracking-wide text-slate-500">
+          <%= invoices.length %> invoice<%= invoices.length === 1 ? '' : 's' %><% if (overdueCount) { %><span class="text-amber-400"> · <%= overdueCount %> overdue</span><% } %>
+        </td>
+        <td class="pt-3 text-right text-xs uppercase tracking-wide text-slate-500">Outstanding</td>
+        <td class="pt-3 text-right font-mono text-slate-200"><%= formatUSD(outstandingCents) %></td>
+      </tr>
+    </tfoot>
   </table>
 <% } %>
 

@@ -271,6 +271,22 @@ export function withSnapshots(invoice, { vendor, client, force = false, storedSt
   };
 }
 
+/**
+ * Whether an invoice is past due.
+ *
+ * Only a sent invoice can be overdue. A draft has not been sent to anyone, and
+ * a paid or void one is settled — flagging either would be noise on the one
+ * screen where the flag needs to mean something.
+ */
+export const isOverdue = (invoice, asOf = today()) =>
+  invoice.status === 'sent' && invoice.dueDate < asOf;
+
+/** Days past due, for the list. Negative before the due date. */
+export function daysOverdue(invoice, asOf = today()) {
+  const day = 24 * 60 * 60 * 1000;
+  return Math.round((Date.parse(`${asOf}T00:00:00Z`) - Date.parse(`${invoice.dueDate}T00:00:00Z`)) / day);
+}
+
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',

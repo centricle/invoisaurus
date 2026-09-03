@@ -5,7 +5,7 @@ import {
 } from '../store.js';
 import {
   makeInvoice, validateInvoice, invoiceTotals,
-  dueDateFor, today, TERMS, INVOICE_STATUSES, withSnapshots, INVOICE_ID,
+  dueDateFor, today, TERMS, INVOICE_STATUSES, withSnapshots, isOverdue, INVOICE_ID,
 } from '../schema.js';
 import { parseCents, parseQuantity } from '../money.js';
 import { generateInvoicePdf } from '../lib/pdf/generate.js';
@@ -84,8 +84,19 @@ invoicesRouter.get('/', (req, res) => {
       client: clients.find((c) => c.id === inv.clientId) || null,
     }));
 
+  // Outstanding is what you actually want to know from this screen: what has
+  // been sent and not yet paid. Drafts are not money owed and voids never were.
+  const outstandingCents = invoices
+    .filter((inv) => inv.status === 'sent')
+    .reduce((sum, inv) => sum + inv.totalCents, 0);
+
   res.render('invoices/index', {
     invoices, clients, vendors: listVendors(), INVOICE_STATUSES, clientFilter, statusFilter,
+    outstandingCents,
+    // Wrapped, not passed by reference: Array.filter supplies the index as the
+    // second argument, which would land in isOverdue's `asOf` parameter and
+    // silently compare a date string against a number.
+    overdueCount: invoices.filter((inv) => isOverdue(inv)).length,
   });
 });
 
