@@ -7,6 +7,15 @@ down during an actual billing attempt. Runs on your machine, stores plain JSON,
 and generates the PDF you send to the client. No account, no network, no
 database.
 
+![The invoice editor: line items, live totals and a notes field](docs/editor.png)
+
+Line-item arithmetic happens in the browser as you type. Everything else is a
+form POST. The preview below the editor is not a second rendering of the same
+data — it is an iframe pointed at the real PDF route, so what you see is the
+file the client gets.
+
+![The generated PDF: ACME Corporation billing Wile E. Coyote $695.00](docs/invoice-pdf.png)
+
 ## Quick start
 
 Needs [Node](https://nodejs.org) 22 or newer. Nothing else.
@@ -162,4 +171,4 @@ framework, three runtime dependencies.
 
 ## License
 
-MIT
+[MIT](./LICENSE)
