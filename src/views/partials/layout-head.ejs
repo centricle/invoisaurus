@@ -19,3 +19,9 @@
     </div>
   </header>
   <main class="mx-auto max-w-5xl px-6 py-10">
+    <% if (locals.flash) { %>
+      <p role="status"
+         class="mb-6 rounded-md border border-emerald-900/60 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-300">
+        <%= flash %>
+      </p>
+    <% } %>

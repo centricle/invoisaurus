@@ -13,6 +13,7 @@ import {
 } from './src/schema.js';
 import { field } from './src/viewHelpers.js';
 import { ejsEngine } from './src/viewEngine.js';
+import { takeFlash } from './src/flash.js';
 import { clientsRouter } from './src/routes/clients.js';
 import { vendorsRouter } from './src/routes/vendors.js';
 import { invoicesRouter } from './src/routes/invoices.js';
@@ -38,6 +39,14 @@ Object.assign(app.locals, {
   formatUSD, formatQuantity, formatCents, quantityInputValue, centsInputValue,
   clientLabel, addressLines, termById, dueDateFor, formatInvoiceNumber,
   isOverdue, daysOverdue, field, dataDir: displayDataDir,
+});
+
+// A confirmation belongs to one moment, so it is read and cleared here rather
+// than left in the URL where a refresh or a bookmark would show it again.
+// See src/flash.js.
+app.use((req, res, next) => {
+  res.locals.flash = takeFlash(req, res);
+  next();
 });
 
 app.get('/', (req, res) => res.redirect('/invoices'));

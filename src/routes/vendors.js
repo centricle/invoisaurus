@@ -1,6 +1,7 @@
 import express from 'express';
 import { listVendors, getVendor, createVendor, updateVendor } from '../store.js';
 import { makeVendor, validateVendor, emptyAddress } from '../schema.js';
+import { setFlash } from '../flash.js';
 
 export const vendorsRouter = express.Router();
 
@@ -34,6 +35,7 @@ vendorsRouter.post('/', (req, res) => {
   const errors = validateVendor(input, { takenPrefixes: listVendors().map((v) => v.numberPrefix) });
   if (errors.length) return res.status(422).render('vendors/form', { vendor: input, isNew: true, errors });
   const vendor = createVendor(input);
+  setFlash(res, 'vendor-created', vendor.name);
   res.redirect(`/vendors/${vendor.id}/edit`);
 });
 
@@ -58,5 +60,6 @@ vendorsRouter.post('/:id', (req, res) => {
   });
   if (errors.length) return res.status(422).render('vendors/form', { vendor: input, isNew: false, errors });
   updateVendor(existing.id, input);
+  setFlash(res, 'vendor-saved');
   res.redirect('/vendors');
 });

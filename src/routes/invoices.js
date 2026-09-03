@@ -9,6 +9,7 @@ import {
 } from '../schema.js';
 import { parseCents, parseQuantity } from '../money.js';
 import { generateInvoicePdf } from '../lib/pdf/generate.js';
+import { setFlash } from '../flash.js';
 
 export const invoicesRouter = express.Router();
 
@@ -137,6 +138,7 @@ invoicesRouter.post('/', (req, res) => {
   const invoice = saveInvoice(withSnapshots({ ...input, id, number }, {
     vendor: getVendor(input.vendorId), client: getClient(input.clientId), force: true,
   }), { create: true });
+  setFlash(res, 'invoice-created', invoice.id);
   res.redirect(`/invoices/${invoice.id}`);
 });
 
@@ -196,6 +198,7 @@ invoicesRouter.post('/:id', (req, res) => {
   saveInvoice(withSnapshots(input, {
     vendor: getVendor(input.vendorId), client: getClient(input.clientId), storedStatus: existing.status,
   }));
+  setFlash(res, 'invoice-saved');
   res.redirect(`/invoices/${existing.id}`);
 });
 
@@ -205,6 +208,7 @@ invoicesRouter.post('/:id/delete', (req, res) => {
   // The vendor counter is deliberately not rewound. A gap in the series is a
   // deleted draft; a reused number is an accounting problem.
   deleteInvoice(invoice.id);
+  setFlash(res, 'invoice-deleted', invoice.id);
   res.redirect('/invoices');
 });
 

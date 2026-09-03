@@ -3,6 +3,7 @@ import {
   listClients, getClient, createClient, updateClient, invoiceCountForClient,
 } from '../store.js';
 import { makeClient, validateClient, CLIENT_TYPES, emptyAddress } from '../schema.js';
+import { setFlash } from '../flash.js';
 
 export const clientsRouter = express.Router();
 
@@ -44,6 +45,7 @@ clientsRouter.post('/', (req, res) => {
     });
   }
   const client = createClient(input);
+  setFlash(res, 'client-created', client.name);
   res.redirect(`/clients/${client.id}/edit`);
 });
 
@@ -71,5 +73,6 @@ clientsRouter.post('/:id', (req, res) => {
     });
   }
   updateClient(existing.id, input);
+  setFlash(res, 'client-saved');
   res.redirect('/clients');
 });
