@@ -86,6 +86,9 @@ npm test
 12 tests on Node's built-in runner. No test dependencies, no config, no watch
 mode to learn. They use temporary directories and never touch your data.
 
+`.github/workflows/test.yml` runs the same command on pushes to `main` and on
+every pull request, against the Node version pinned in `.nvmrc`.
+
 ## Project layout
 
 | Path | Purpose |
