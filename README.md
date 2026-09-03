@@ -106,7 +106,11 @@ Plain JSON, one record per file for invoices, human-readable and greppable
 without the app. Writes are atomic (temp file plus rename), so an interrupted
 save cannot leave a half-written invoice.
 
-Backing it up is up to you. Nothing about the app cares how, or whether.
+Backing it up is up to you. `npm run data:commit` exists for one specific setup:
+a data directory that is itself a git repo. It stages and commits everything in
+one step. Point it at a directory that is not a repo and it commits nothing and
+exits with an error saying how to initialize one. Any other backup approach, or
+none, works the same as far as the app is concerned.
 
 ## Tests
 
