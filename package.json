@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Local invoice generator. Web UI in, PDF out.",
   "scripts": {
+    "setup": "sh scripts/bootstrap.sh",
     "dev": "concurrently -n css,web -c magenta,green \"npm:css\" \"node --watch server.js\"",
     "start": "npm run css:build && node server.js",
     "css": "npx @tailwindcss/cli -i public/css/app.css -o public/css/dist/app.css --watch",
@@ -38,6 +39,6 @@
     "local-first"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.6.0"
   }
 }

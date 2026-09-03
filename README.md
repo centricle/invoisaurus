@@ -7,9 +7,25 @@ down during an actual billing attempt. Runs on your machine, stores plain JSON,
 and generates the PDF you send to the client. No account, no network, no
 database.
 
-## Setup
+## Quick start
 
 Needs [Node](https://nodejs.org) 22 or newer. Nothing else.
+
+```sh
+git clone https://github.com/centricle/invoisaurus.git
+cd invoisaurus
+npm run setup
+npm run dev
+```
+
+Then open <http://localhost:7054>.
+
+`npm run setup` installs dependencies, builds the stylesheet, and seeds a demo
+vendor, client and invoice so there is something to look at. It is safe to
+re-run.
+
+On Windows, or if you would rather not run the script, do the same three things
+by hand, then start it:
 
 ```sh
 npm install
@@ -17,8 +33,6 @@ npm run css:build
 npm run seed
 npm run dev
 ```
-
-Then open <http://localhost:7054>.
 
 The CSS build is not optional. The compiled stylesheet is generated rather than
 committed, so a fresh clone that skips it runs fine but renders every page
