@@ -14,6 +14,7 @@ Needs [Node](https://nodejs.org) 22 or newer. Nothing else.
 ```sh
 npm install
 npm run css:build
+npm run seed
 npm run dev
 ```
 
@@ -22,6 +23,37 @@ Then open <http://localhost:7054>.
 The CSS build is not optional. The compiled stylesheet is generated rather than
 committed, so a fresh clone that skips it runs fine but renders every page
 unstyled.
+
+## Demo data
+
+The seed creates three fictional records:
+
+| Record | Value |
+|---|---|
+| Vendor | ACME Corporation, invoice prefix `ACM-` |
+| Client | Wile E. Coyote |
+| Invoice | `ACM-0001`, draft, $695.00 |
+
+**Removing them:**
+
+```sh
+npm run seed -- --remove
+```
+
+That clears the vendor, the client and the invoice, leaving an empty data
+directory ready for your own records. It refuses to run if the directory
+contains anything that is not demo data, so it cannot eat real invoices. If it
+refuses, delete the demo records by hand or point `INVOISAURUS_DATA_DIR` somewhere
+new.
+
+You can also just delete the data directory. The app recreates it empty on the
+next start, so that is a clean slate rather than a repair.
+
+One thing worth knowing before you start numbering for real: **invoice numbers
+are never reused within a vendor's lifetime.** Delete `ACM-0003` and the next
+invoice is still `ACM-0004`. A gap in the series is a voided invoice; a
+duplicate is an accounting problem. Removing the demo vendor entirely does reset
+the counter, because the counter lives on the vendor record.
 
 ## Design
 
@@ -43,9 +75,7 @@ and client details as they were when it was issued. Editing a client's address
 never alters a past invoice, because an invoice is a record of what was sent.
 
 **Invoice numbers are per-vendor.** The number is the issuing entity's book.
-Each vendor carries its own prefix, padding and counter. Numbers are never
-reused, including after a delete: a gap is a voided invoice, a duplicate is an
-accounting problem.
+Each vendor carries its own prefix, padding and counter.
 
 ## Configuration
 
