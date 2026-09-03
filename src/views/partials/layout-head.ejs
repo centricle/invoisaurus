@@ -4,13 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %> · Invoisaurus</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Ctext y=%2713%27 font-size=%2713%27%3E%F0%9F%A7%BE%3C/text%3E%3C/svg%3E">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/dist/app.css">
 </head>
 <body class="h-full bg-slate-950 text-slate-200 antialiased">
   <header class="border-b border-slate-800">
     <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-      <a href="/" class="text-sm font-semibold tracking-tight text-slate-100">Invoisaurus</a>
+      <a href="/" class="flex items-center gap-2 text-sm font-semibold tracking-tight text-slate-100">
+        <!-- Inlined rather than <img src="/favicon.svg">, so the mark inherits
+             currentColor and sizes in rem alongside the root scale. -->
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 14h6" /><path d="M4 2h10" />
+          <rect x="4" y="18" width="16" height="4" rx="1" /><rect x="4" y="6" width="16" height="4" rx="1" />
+        </svg>
+        Invoisaurus
+      </a>
       <nav class="flex gap-5 text-sm">
         <%
           const section = (locals.currentPath || '/').split('/')[1] || 'invoices';

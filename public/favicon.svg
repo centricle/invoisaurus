@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <style>
+    /*
+     * A favicon renders outside any document, so `currentColor` has nothing to
+     * inherit from and falls back to black — invisible on a dark tab strip.
+     * The color is set here instead, and follows the reader's theme.
+     */
+    svg { color: #0f172a; }
+    @media (prefers-color-scheme: dark) { svg { color: #e2e8f0; } }
+  </style>
+  <path d="M4 14h6" />
+  <path d="M4 2h10" />
+  <rect x="4" y="18" width="16" height="4" rx="1" />
+  <rect x="4" y="6" width="16" height="4" rx="1" />
+</svg>
