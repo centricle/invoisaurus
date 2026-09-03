@@ -14,7 +14,13 @@
   <% if (!isNew) { %>
     <div class="flex items-center gap-3">
       <a href="/invoices/<%= invoice.id %>/pdf?download=1"
-         class="rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:border-slate-500">Download PDF</a>
+         class="inline-flex items-center gap-2 rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:border-slate-500">
+        Download PDF
+        <svg viewBox="0 0 20 20" aria-hidden="true" class="h-4 w-4" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 3v9" /><path d="M6.5 8.5 10 12l3.5-3.5" /><path d="M4 14.5v1A1.5 1.5 0 0 0 5.5 17h9a1.5 1.5 0 0 0 1.5-1.5v-1" />
+        </svg>
+      </a>
     </div>
   <% } %>
 </div>
@@ -85,7 +91,7 @@
                      class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
             </td>
             <td class="py-2 pr-3">
-              <input type="text" name="quantity[]" inputmode="decimal" value="<%= quantityInputValue(li.quantityMilli) %>"
+              <input name="quantity[]" type="number" step="any" min="0" inputmode="decimal" data-stepper data-step-amount="0.25" value="<%= quantityInputValue(li.quantityMilli) %>"
                      class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-right text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
             </td>
             <td class="py-2 pr-3">
@@ -96,7 +102,7 @@
               <%= totals.amounts[i] ? formatUSD(totals.amounts[i]) : '—' %>
             </td>
             <td class="py-2 text-right">
-              <button type="button" data-remove title="Remove line"
+              <button type="button" data-remove title="Remove line" aria-label="Remove line item"
                       class="rounded px-2 py-1 text-slate-600 hover:text-red-400 disabled:opacity-30 disabled:hover:text-slate-600">&times;</button>
             </td>
           </tr>
@@ -167,7 +173,7 @@
              class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
     </td>
     <td class="py-2 pr-3">
-      <input type="text" name="quantity[]" inputmode="decimal"
+      <input name="quantity[]" type="number" step="any" min="0" inputmode="decimal" data-stepper data-step-amount="0.25"
              class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-right text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
     </td>
     <td class="py-2 pr-3">
@@ -176,11 +182,12 @@
     </td>
     <td class="py-2 text-right font-mono text-slate-300" data-amount>—</td>
     <td class="py-2 text-right">
-      <button type="button" data-remove title="Remove line"
+      <button type="button" data-remove title="Remove line" aria-label="Remove line item"
               class="rounded px-2 py-1 text-slate-600 hover:text-red-400 disabled:opacity-30 disabled:hover:text-slate-600">&times;</button>
     </td>
   </tr>
 </template>
+
 
 <% if (!isNew) { %>
   <section class="mt-12">
@@ -192,7 +199,7 @@
     <!-- The preview is the real PDF, not a second HTML rendering of the same
          data. There is nothing here that can drift from what the client gets. -->
     <iframe src="/invoices/<%= invoice.id %>/pdf#toolbar=0" title="Invoice <%= invoice.id %>"
-            class="h-[900px] w-full rounded-lg border border-slate-800 bg-slate-900"></iframe>
+            class="h-[56.25rem] w-full rounded-lg border border-slate-800 bg-slate-900"></iframe>
   </section>
 <% } %>
 

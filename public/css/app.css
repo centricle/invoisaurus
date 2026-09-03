@@ -1,1 +1,140 @@
 @import "tailwindcss";
+
+/*
+ * Root scale.
+ *
+ * Everything reads a step small at the default 16px root, so the whole UI is
+ * scaled the way Chrome's 125% zoom scales it. A percentage rather than a fixed
+ * 20px, so a reader who has raised or lowered their own browser font size still
+ * gets that preference honored on top of this.
+ *
+ * Tailwind sizes type, spacing and max-widths in rem, so they all follow. Any
+ * hardcoded px value does not — which is why this file and the templates avoid
+ * them for anything that should scale.
+ */
+html {
+  font-size: 125%;
+}
+
+/*
+ * Form-control chrome.
+ *
+ * These are global element rules rather than utility classes because every one
+ * of them is a property of the control itself, not of a particular layout. Done
+ * per-template they drift: the caret was flush against the border on four
+ * different selects because each carried its own copy of the padding.
+ */
+
+button:not(:disabled),
+select,
+summary,
+[type="submit"],
+[type="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled,
+[type="button"]:disabled {
+  cursor: default;
+}
+
+/* Native select carets sit hard against the right edge. Replace with a chevron
+   that has room to breathe. */
+select {
+  appearance: none;
+  padding-right: 2.25rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394a3b8' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 1.1em 1.1em;
+}
+
+/* The calendar button is nearly invisible against a dark field. Brighten it,
+   give it a hit area, and make it read as clickable. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.85;
+  filter: invert(0.75);
+  padding: 0.2rem;
+  margin-left: 0.25rem;
+  border-radius: 0.25rem;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background-color: rgba(148, 163, 184, 0.2);
+}
+
+/* Date fields also grow a vertical spinner on focus, which reads as a sort
+   control sitting next to the calendar button. The calendar covers the job. */
+input[type="date"]::-webkit-inner-spin-button {
+  display: none;
+}
+
+/* The native spinner is a pale slab on a dark field. public/js/stepper.js
+   draws a replacement inside the control. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.stepper {
+  position: relative;
+  display: block;
+}
+
+.stepper > input {
+  padding-right: 1.75rem;
+}
+
+.stepper-buttons {
+  position: absolute;
+  top: 0.0625rem;
+  bottom: 0.0625rem;
+  right: 0.0625rem;
+  display: flex;
+  flex-direction: column;
+  width: 1.4rem;
+  overflow: hidden;
+  border-radius: 0 0.35rem 0.35rem 0;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+/* Kept out of the way until the field is in play, so a table of quantities
+   does not read as a wall of arrows. */
+.stepper:hover .stepper-buttons,
+.stepper:focus-within .stepper-buttons {
+  opacity: 1;
+}
+
+.stepper-buttons button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: rgb(30 41 59);
+  color: rgb(148 163 184);
+}
+
+.stepper-buttons button:hover {
+  background: rgb(51 65 85);
+  color: rgb(226 232 240);
+}
+
+.stepper-buttons button:active {
+  background: rgb(2 132 199);
+  color: #fff;
+}
+
+.stepper-buttons svg {
+  width: 0.6rem;
+  height: 0.45rem;
+}
