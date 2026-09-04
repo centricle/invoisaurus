@@ -32,7 +32,7 @@
   </form>
 <% } %>
 
-<% if (!invoices.length) { %>
+<% if (!invoices.length && !unreadable.length) { %>
   <div class="rounded-lg border border-dashed border-slate-800 px-6 py-16 text-center">
     <p class="text-sm text-slate-400">
       <%= clientFilter || statusFilter ? 'No invoices match that filter.' : 'No invoices yet.' %>
@@ -73,11 +73,23 @@
           <td class="py-3 text-right font-mono <%= inv.status === 'sent' ? 'text-slate-100' : 'text-slate-600' %>"><%= formatUSD(inv.totalCents) %></td>
         </tr>
       <% }) %>
+      <% unreadable.forEach((u) => { %>
+        <tr class="hover:bg-slate-900/50">
+          <td class="py-3 font-mono text-slate-400"><%= u.file %></td>
+          <td class="py-3 text-slate-500" colspan="3">
+            This file is in the invoices directory but could not be read. Repair or remove it.
+          </td>
+          <td class="py-3">
+            <span class="rounded-full border border-red-900 bg-red-950/60 px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-widest text-red-300">unreadable</span>
+          </td>
+          <td class="py-3 text-right font-mono text-slate-700">—</td>
+        </tr>
+      <% }) %>
     </tbody>
     <tfoot>
       <tr class="border-t border-slate-800">
         <td colspan="4" class="pt-3 text-xs uppercase tracking-wide text-slate-500">
-          <%= invoices.length %> invoice<%= invoices.length === 1 ? '' : 's' %><% if (overdueCount) { %><span class="text-amber-400"> · <%= overdueCount %> overdue</span><% } %>
+          <%= invoices.length %> invoice<%= invoices.length === 1 ? '' : 's' %><% if (overdueCount) { %><span class="text-amber-400"> · <%= overdueCount %> overdue</span><% } %><% if (unreadable.length) { %><span class="text-red-400"> · <%= unreadable.length %> unreadable</span><% } %>
         </td>
         <td class="pt-3 text-right text-xs uppercase tracking-wide text-slate-500">Outstanding</td>
         <td class="pt-3 text-right font-mono text-slate-100"><%= formatUSD(outstandingCents) %></td>

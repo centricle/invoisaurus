@@ -1,6 +1,6 @@
 import express from 'express';
 import {
-  listInvoices, getInvoice, saveInvoice, deleteInvoice, allocateInvoiceNumber,
+  scanInvoices, getInvoice, saveInvoice, deleteInvoice, allocateInvoiceNumber,
   listClients, getClient, listVendors, getVendor,
 } from '../store.js';
 import {
@@ -76,7 +76,13 @@ invoicesRouter.get('/', (req, res) => {
   const clients = listClients();
   const { client: clientFilter = '', status: statusFilter = '' } = req.query;
 
-  const invoices = listInvoices()
+  // Files that would not parse are listed alongside the invoices rather than
+  // thrown. They carry no client and no status, so no filter can describe one
+  // and they are shown whatever the filter says -- a damaged file that only
+  // appears under the right filter is a damaged file nobody finds.
+  const { invoices: readable, unreadable } = scanInvoices();
+
+  const invoices = readable
     .filter((inv) => (!clientFilter || inv.clientId === clientFilter))
     .filter((inv) => (!statusFilter || inv.status === statusFilter))
     .map((inv) => ({
@@ -92,7 +98,8 @@ invoicesRouter.get('/', (req, res) => {
     .reduce((sum, inv) => sum + inv.totalCents, 0);
 
   res.render('invoices/index', {
-    invoices, clients, vendors: listVendors(), INVOICE_STATUSES, clientFilter, statusFilter,
+    invoices, unreadable, clients, vendors: listVendors(), INVOICE_STATUSES,
+    clientFilter, statusFilter,
     outstandingCents,
     // Wrapped, not passed by reference: Array.filter supplies the index as the
     // second argument, which would land in isOverdue's `asOf` parameter and

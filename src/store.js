@@ -172,14 +172,42 @@ function invoicePath(id) {
   return file;
 }
 
-export function listInvoices() {
-  if (!fs.existsSync(INVOICE_DIR)) return [];
-  return fs.readdirSync(INVOICE_DIR)
-    .filter((f) => f.endsWith('.json'))
-    .map((f) => readJson(path.join(INVOICE_DIR, f), null))
-    .filter(Boolean)
-    .sort((a, b) => (b.issueDate).localeCompare(a.issueDate) || (b.number - a.number));
+/**
+ * Read every invoice, separating out the ones that would not parse.
+ *
+ * A registry file that will not parse is a whole-app problem, and readJson
+ * throws for it. One invoice among hundreds is not the same event. Refusing to
+ * render the list because a single file is damaged hides every other invoice
+ * too, and does nothing to help find the damaged one.
+ *
+ * Dropping it silently would be worse than the throw, though: an invoice that
+ * quietly stops appearing is an invoice nobody chases for payment. So a bad
+ * file is set aside and handed back to the caller, which puts it on the page
+ * where someone will actually see it.
+ */
+export function scanInvoices() {
+  if (!fs.existsSync(INVOICE_DIR)) return { invoices: [], unreadable: [] };
+
+  const invoices = [];
+  const unreadable = [];
+  for (const file of fs.readdirSync(INVOICE_DIR).filter((f) => f.endsWith('.json'))) {
+    try {
+      const invoice = readJson(path.join(INVOICE_DIR, file), null);
+      // null only if the file vanished between the readdir and the read.
+      if (invoice) invoices.push(invoice);
+    } catch (err) {
+      unreadable.push({ file, message: err.message });
+    }
+  }
+
+  invoices.sort((a, b) => (b.issueDate).localeCompare(a.issueDate) || (b.number - a.number));
+  unreadable.sort((a, b) => a.file.localeCompare(b.file));
+  return { invoices, unreadable };
 }
+
+/** The readable invoices, newest first. Callers that cannot show a damaged file
+ *  to anyone want this; the invoice list itself wants `scanInvoices`. */
+export const listInvoices = () => scanInvoices().invoices;
 
 export const getInvoice = (id) => readJson(invoicePath(id), null);
 
