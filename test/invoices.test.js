@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+// Binds INVOISAURUS_DATA_DIR before config.js resolves it. See test/tmpdir.js.
+import './tmpdir.js';
 import {
   makeInvoice, makeClient, makeVendor, withSnapshots, snapshotClient, snapshotVendor, validateInvoice,
 } from '../src/schema.js';

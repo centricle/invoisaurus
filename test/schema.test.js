@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+// Binds INVOISAURUS_DATA_DIR before config.js resolves it. See test/tmpdir.js.
+import './tmpdir.js';
 import {
   dueDateFor, addDays, formatInvoiceNumber, makeVendor, makeClient, makeInvoice, validateVendor,
   snapshotClient, invoiceTotals, validateInvoice, addressLines, isOverdue, daysOverdue,
-  formatLongDate,
+  formatLongDate, validateClient, termById,
 } from '../src/schema.js';
 import { parseCents, parseQuantity } from '../src/money.js';
 
@@ -130,4 +132,46 @@ test('two vendors cannot produce the same invoice id', () => {
   const a = makeVendor({ name: 'A Co', numberPrefix: 'ACO-' });
   const b = makeVendor({ name: 'B Co', numberPrefix: 'BCO-' });
   assert.notEqual(formatInvoiceNumber(a, 1), formatInvoiceNumber(b, 1));
+});
+
+
+test('a client needs a legal name and a real type', () => {
+  const ok = { name: 'Wile E. Coyote', type: 'individual' };
+  assert.deepEqual(validateClient(ok), []);
+
+  assert.match(validateClient({ ...ok, name: '   ' })[0], /Legal name is required/);
+  assert.match(validateClient({ ...ok, type: 'walrus' })[0], /Business or Individual/);
+  assert.equal(validateClient({ name: '', type: '' }).length, 2, 'both problems are reported at once');
+});
+
+test('a vendor counter may move forward but not backward', () => {
+  // Gaps are voided invoices. A duplicate is on someone's books twice.
+  const existing = makeVendor({ name: 'ACME Corporation', numberPrefix: 'ACM-', nextNumber: 42 });
+  const input = { name: 'ACME Corporation', numberPrefix: 'ACM-', numberPad: 4 };
+
+  assert.deepEqual(validateVendor({ ...input, nextNumber: 42 }, { existing }), []);
+  assert.deepEqual(validateVendor({ ...input, nextNumber: 99 }, { existing }), []);
+  assert.match(
+    validateVendor({ ...input, nextNumber: 41 }, { existing })[0],
+    /cannot move backward from 42/,
+  );
+});
+
+test('number padding has to be a whole number in range', () => {
+  const input = { name: 'ACME Corporation', numberPrefix: 'ACM-', nextNumber: 1 };
+  assert.deepEqual(validateVendor({ ...input, numberPad: 4 }), []);
+  for (const numberPad of [0, 11, 2.5, Number('')]) {
+    assert.match(validateVendor({ ...input, numberPad })[0], /padding must be between 1 and 10/);
+  }
+});
+
+test('an unrecognized terms value falls back rather than erroring', () => {
+  // Worth pinning because it is a silent path: makeInvoice validates `status`
+  // against a list but not `terms`, so a junk value resolves to TERMS[0] and
+  // the due date quietly equals the issue date. That is the current contract.
+  assert.equal(termById('net45').days, 45);
+  assert.equal(termById('nonsense').id, 'on-receipt');
+  assert.equal(dueDateFor('2026-09-02', 'nonsense'), '2026-09-02');
+  assert.equal(dueDateFor('2026-09-02', 'net15'), '2026-09-17');
+  assert.equal(dueDateFor('2026-09-02', 'net60'), '2026-11-01');
 });

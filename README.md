@@ -5,7 +5,8 @@ Local invoice generator. Web UI in, PDF out.
 Built to replace a hosted invoicing product whose UI was slow and whose site was
 down during an actual billing attempt. Runs on your machine, stores plain JSON,
 and generates the PDF you send to the client. No account, no network, no
-database.
+database. The server binds loopback only, so an editor with no login on it does
+not appear on whatever network the machine has joined.
 
 ![The invoice editor: line items, live totals and a notes field](docs/editor.png)
 
@@ -18,7 +19,7 @@ file the client gets.
 
 ## Quick start
 
-Needs [Node](https://nodejs.org) 22 or newer. Nothing else.
+Needs [Node](https://nodejs.org) 22.6 or newer. Nothing else.
 
 ```sh
 git clone https://github.com/centricle/invoisaurus.git
@@ -147,11 +148,13 @@ none, works the same as far as the app is concerned.
 npm test
 ```
 
-68 tests on Node's built-in runner. No test dependencies, no config, no watch
-mode to learn. They use temporary directories and never touch your data.
+101 tests on Node's built-in runner. No test dependencies, no config, no watch
+mode to learn.
 
-`test/routes.test.js` runs the real Express app against a temporary data
-directory on an ephemeral port, so the request handlers are covered too, not
+Every test file binds `INVOISAURUS_DATA_DIR` to a fresh temporary directory before
+it loads anything from `src/`, so the suite cannot reach your records even by
+accident. `test/routes.test.js` runs the real Express app against one of those
+directories on an ephemeral port, so the request handlers are covered too, not
 just the pure functions underneath them.
 
 `.github/workflows/test.yml` runs the same command on pushes to `main` and on
@@ -169,7 +172,7 @@ every pull request, against the Node version pinned in `.nvmrc`.
 | `src/lib/pdf/` | `layout.js` decides where things go, `generate.js` draws them |
 | `src/routes/` | One router each for invoices, clients, vendors |
 | `src/views/` | EJS templates |
-| `public/js/` | Browser-side behavior for the invoice editor |
+| `public/js/` | Browser-side behavior: the invoice editor, and the number steppers every form uses |
 
 Express 5, EJS, Tailwind 4 via the CLI, pdf-lib. Line-item arithmetic is vanilla
 JS in the browser; everything else is a form POST. No bundler, no client

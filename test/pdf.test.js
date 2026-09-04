@@ -1,10 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+// Binds INVOISAURUS_DATA_DIR before config.js resolves it. See test/tmpdir.js.
+import './tmpdir.js';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { generateInvoicePdf, planPages } from '../src/lib/pdf/generate.js';
 import { makeInvoice, snapshotClient, snapshotVendor, makeClient, makeVendor } from '../src/schema.js';
 import { wrapText, sanitize, CONTENT, META, SIZE } from '../src/lib/pdf/layout.js';
 import { parseCents, parseQuantity } from '../src/money.js';
+import { pdfStrings, pdfText } from './pdftext.js';
 
 const vendor = makeVendor({
   name: 'ACME Corporation', email: 'billing@acme-corp.example', numberPrefix: 'ACM-',
@@ -185,4 +188,68 @@ test('characters WinAnsi cannot encode are dropped, not passed to pdf-lib', asyn
     description: `Discovery${control}`, quantityMilli: 1000, rateCents: 15000,
   }]));
   assert.ok(bytes.length > 0, 'a control character must not fail the render');
+});
+
+
+test('the document prints formatted currency, not raw cents', async () => {
+  // Every other assertion in this file is geometric, and geometry cannot tell
+  // "$1,875.00" from "187500" -- both are just a string in the amount column.
+  // Reading the text back is the only check that the client receives money.
+  const invoice = invoiceWith([line('Discovery', '12.5'), line('Build', '2', '85')]);
+  const strings = pdfStrings(await generateInvoicePdf(invoice));
+  const text = strings.join('\n');
+
+  assert.ok(text.includes('$150.00'), 'the rate column is currency');
+  assert.ok(text.includes('$1,875.00'), 'so is the amount column, grouped at the thousand');
+  assert.ok(text.includes('$2,045.00'), 'and the total');
+  assert.ok(text.includes('Amount Due'));
+
+  for (const raw of ['187500', '15000', '204500']) {
+    assert.ok(!strings.includes(raw), `raw cents (${raw}) must never reach the page`);
+  }
+});
+
+test('quantities print without trailing zeros and dates print long', async () => {
+  const text = pdfText(await generateInvoicePdf(invoiceWith([line('Discovery', '12.5'), line('Build', '8')])));
+  assert.ok(text.includes('12.5'), 'a fractional quantity keeps its fraction');
+  assert.ok(!text.includes('12.500'), 'but not the padding it is stored with');
+  assert.ok(text.includes('8'), 'a whole quantity has no decimal point');
+  assert.ok(text.includes('September 3, 2026'), 'the issue date');
+  assert.ok(text.includes('October 3, 2026'), 'and the due date the terms imply');
+});
+
+test('a snapshot the registry has moved on from still prints', async () => {
+  // The snapshot has to be a copy, not a view. This is the unit-level half of
+  // the guarantee; routes.test.js asserts it end to end through the PDF route.
+  const invoice = invoiceWith([line('Discovery')]);
+
+  vendor.name = 'ACME Holdings LLC';
+  vendor.address.street = '4 Ledge Court';
+  client.address.street = '9 Rimrock Way';
+  try {
+    const text = pdfText(await generateInvoicePdf(invoice));
+    assert.ok(text.includes('ACME Corporation'));
+    assert.ok(text.includes('1 Anvil Plaza'));
+    assert.ok(text.includes('500 Harbor Blvd'));
+    assert.ok(!text.includes('ACME Holdings LLC'));
+    assert.ok(!text.includes('9 Rimrock Way'));
+  } finally {
+    vendor.name = 'ACME Corporation';
+    vendor.address.street = '1 Anvil Plaza';
+    client.address.street = '500 Harbor Blvd';
+  }
+});
+
+test('an invoice with no line items still renders a document', async () => {
+  // saveInvoice does not validate, so an empty invoice can reach the PDF route
+  // from a hand-edited file. It must not be the thing that turns a page into a
+  // 500: planPages produces one empty page and the table head is skipped.
+  const empty = invoiceWith([]);
+  const bytes = await generateInvoicePdf(empty);
+  assert.equal((await PDFDocument.load(bytes)).getPageCount(), 1);
+
+  const text = pdfText(bytes);
+  assert.ok(text.includes('Amount Due'));
+  assert.ok(text.includes('$0.00'), 'a total of nothing is still a total');
+  assert.ok(!text.includes('DESCRIPTION'), 'no column headings over an empty table');
 });

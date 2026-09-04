@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+// Binds INVOISAURUS_DATA_DIR before config.js resolves it. See test/tmpdir.js.
+import './tmpdir.js';
 import {
   parseCents, parseQuantity, lineAmountCents, formatUSD, formatQuantity, sumCents,
   quantityInputValue, centsInputValue,
@@ -77,4 +79,37 @@ test('display formatting still groups thousands', () => {
 test('a null quantity or rate renders an empty field, not a zero', () => {
   assert.equal(quantityInputValue(null), '');
   assert.equal(centsInputValue(null), '');
+});
+
+
+test('zero is a value and empty is not', () => {
+  // parseCents returns null for "no answer" so a blank rate is not billed as
+  // $0.00. Zero itself has to survive that, and it is falsy, so every caller
+  // has to test `!= null` rather than truthiness.
+  assert.equal(parseCents('0'), 0);
+  assert.equal(parseCents('0.00'), 0);
+  assert.equal(parseQuantity('0'), 0);
+  assert.equal(parseCents(''), null);
+  assert.equal(parseCents('   '), null);
+  assert.equal(parseCents(null), null);
+  assert.equal(parseCents(undefined), null);
+
+  assert.equal(formatUSD(0), '$0.00');
+  assert.equal(formatQuantity(0), '0');
+  assert.equal(centsInputValue(0), '0.00');
+  assert.equal(quantityInputValue(0), '0');
+
+  assert.equal(formatUSD(null), '', 'a missing value formats as nothing, not as zero');
+});
+
+test('negative amounts round away from zero, like positive ones', () => {
+  // A credit line is the reason this branch exists. Math.round breaks ties
+  // toward positive infinity, so -2.5 would go to -2 without the guard.
+  assert.equal(parseCents('-150.00'), -15000);
+  assert.equal(parseCents('-0.005'), -1, 'the half rounds away from zero, not toward it');
+  assert.equal(lineAmountCents(parseQuantity('-0.5'), parseCents('0.05')), -3);
+  assert.equal(lineAmountCents(parseQuantity('2'), parseCents('-150.00')), -30000);
+  assert.equal(formatUSD(-187500), '-$1,875.00');
+  assert.equal(centsInputValue(-15000), '-150.00');
+  assert.equal(sumCents([15000, -5000, null]), 10000);
 });

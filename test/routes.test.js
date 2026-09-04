@@ -1,8 +1,13 @@
 import { test, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+// Must precede any src import: it binds INVOISAURUS_DATA_DIR before config.js
+// resolves it. See test/tmpdir.js.
+import { DATA_DIR } from './tmpdir.js';
+import * as store from '../src/store.js';
+import { app } from '../server.js';
+import { pdfText } from './pdftext.js';
 
 /**
  * Route-level tests.
@@ -14,11 +19,6 @@ import path from 'node:path';
  * temporary data directory and bound to port 0, so these need no fixtures on
  * disk and no free port.
  */
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'invoisaurus-routes-'));
-process.env.INVOISAURUS_DATA_DIR = dir;
-const store = await import('../src/store.js');
-const { app } = await import('../server.js');
-
 let base;
 
 before(async () => {
@@ -42,7 +42,7 @@ let vendor;
 let client;
 
 beforeEach(() => {
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(DATA_DIR, { recursive: true, force: true });
   store.ensureDataDir();
   vendor = store.createVendor(ACME);
   client = store.createClient(COYOTE);
@@ -154,4 +154,141 @@ test('the vendor picker disappears once the invoice exists', async () => {
   const body = await (await fetch(`${base}/invoices/${invoice.id}`)).text();
   assert.ok(!body.includes('name="vendorId"'), 'no control that the server would ignore');
   assert.ok(body.includes('ACME Corporation'));
+});
+
+
+test('creating an invoice allocates a number and freezes the snapshot', async () => {
+  const res = await post('/invoices', {
+    vendorId: vendor.id,
+    clientId: client.id,
+    issueDate: '2026-09-02',
+    terms: 'net30',
+    dueDate: '2026-10-02',
+    status: 'draft',
+    notes: 'Thanks.',
+    'description[]': 'Discovery',
+    'quantity[]': '12.5',
+    'rate[]': '150.00',
+  });
+
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get('location'), '/invoices/ACM-0001');
+  assert.match(res.headers.get('set-cookie') || '', /flash=invoice-created%3AACM-0001/);
+
+  const saved = store.getInvoice('ACM-0001');
+  assert.equal(saved.number, 1);
+  assert.equal(saved.lineItems[0].quantityMilli, 12500, 'quantity is stored in thousandths');
+  assert.equal(saved.lineItems[0].rateCents, 15000, 'rate is stored in cents');
+  assert.equal(saved.billTo.name, 'Wile E. Coyote', 'the client is snapshotted at creation');
+  assert.equal(saved.remitFrom.name, 'ACME Corporation', 'so is the vendor');
+  assert.equal(store.getVendor(vendor.id).nextNumber, 2, 'the counter moved once');
+});
+
+test('an invoice that fails validation does not burn a number', async () => {
+  // The number is allocated after validation for exactly this reason. Moving
+  // the allocation above the check leaves a gap in the series every time
+  // someone submits an incomplete form, and gaps read as lost invoices.
+  const res = await post('/invoices', {
+    vendorId: vendor.id,
+    clientId: client.id,
+    issueDate: '2026-09-02',
+    terms: 'net30',
+    status: 'draft',
+    'description[]': '',
+    'quantity[]': '',
+    'rate[]': '',
+  });
+
+  assert.equal(res.status, 422);
+  assert.match(await res.text(), /needs at least one line item/);
+  assert.equal(store.getVendor(vendor.id).nextNumber, 1, 'the counter did not move');
+  assert.deepEqual(store.listInvoices(), [], 'and nothing was written');
+});
+
+test('a well-formed id for an invoice that does not exist is a 404', async () => {
+  // Every other 404 test uses a malformed id, which the router's param guard
+  // rejects before a handler runs. This is the other branch: a perfectly legal
+  // id that simply has no file behind it.
+  assert.equal((await fetch(`${base}/invoices/ACM-9999`)).status, 404);
+  assert.equal((await fetch(`${base}/invoices/ACM-9999/pdf`)).status, 404);
+  assert.equal((await post('/invoices/ACM-9999', {})).status, 404);
+  assert.equal((await post('/invoices/ACM-9999/delete', {})).status, 404);
+});
+
+test('one unreadable file does not take the invoice list down with it', async () => {
+  const good = seedInvoice();
+  fs.writeFileSync(path.join(DATA_DIR, 'invoices', 'ACM-0002.json'), '{"id": "ACM-000');
+
+  const res = await fetch(`${base}/invoices`);
+  assert.equal(res.status, 200, 'a damaged file is not a 500');
+
+  const body = await res.text();
+  assert.ok(body.includes(good.id), 'the readable invoices still render');
+  assert.ok(body.includes('ACM-0002.json'), 'the damaged file is named on the page');
+  assert.ok(body.includes('unreadable'), 'and marked as such rather than shown as an invoice');
+  // The parse error carries the file's absolute path. The filename is enough to
+  // go and find it, so the message stays out of the markup.
+  assert.ok(!body.includes('Corrupt data file'), 'the raw parse error is not rendered');
+});
+
+test('the PDF route serves the real document, inline or as a download', async () => {
+  const invoice = seedInvoice();
+
+  const inline = await fetch(`${base}/invoices/${invoice.id}/pdf`);
+  assert.equal(inline.status, 200);
+  assert.equal(inline.headers.get('content-type'), 'application/pdf');
+  assert.match(inline.headers.get('content-disposition'), /^inline; filename="ACM-0001\.pdf"$/);
+
+  const download = await fetch(`${base}/invoices/${invoice.id}/pdf?download=1`);
+  assert.match(download.headers.get('content-disposition'), /^attachment; /);
+});
+
+test('a sent invoice keeps printing the vendor it was actually sent from', async () => {
+  // The snapshot rationale is about what a regenerated PDF says years later,
+  // so the PDF is where it has to be asserted. The vendor side had no test at
+  // all: only the client side did.
+  const sent = seedInvoice({ status: 'sent' });
+  await post(`/invoices/${sent.id}`, formFields(sent, { notes: 'Sent.' }));
+
+  store.updateVendor(vendor.id, {
+    ...ACME, name: 'ACME Holdings LLC', address: { ...ACME.address, street: '4 Ledge Court' },
+  });
+
+  const text = pdfText(await (await fetch(`${base}/invoices/${sent.id}/pdf`)).arrayBuffer());
+  assert.ok(text.includes('ACME Corporation'), 'the PDF prints the name it was sent under');
+  assert.ok(text.includes('1 Anvil Plaza'), 'and the address it was sent from');
+  assert.ok(!text.includes('ACME Holdings LLC'), 'not the renamed registry entry');
+});
+
+test('a confirmation is shown once and does not survive a refresh', async () => {
+  const res = await post('/invoices', {
+    vendorId: vendor.id,
+    clientId: client.id,
+    issueDate: '2026-09-02',
+    terms: 'net30',
+    status: 'draft',
+    'description[]': 'Discovery',
+    'quantity[]': '1',
+    'rate[]': '150',
+  });
+  const cookie = res.headers.get('set-cookie').split(';')[0];
+
+  const first = await fetch(`${base}/invoices/ACM-0001`, { headers: { cookie } });
+  assert.ok((await first.text()).includes('Invoice ACM-0001 created.'));
+  assert.match(first.headers.get('set-cookie') || '', /flash=;/, 'the cookie is cleared on read');
+
+  const again = await fetch(`${base}/invoices/ACM-0001`);
+  assert.ok(!(await again.text()).includes('created.'), 'a refresh does not re-show it');
+});
+
+test('a flash code the app did not write renders nothing', async () => {
+  // `MESSAGES[code]` on its own reaches Object.prototype, so `constructor`
+  // found `Object`, called it, and rendered the argument back in a success
+  // banner. The lookup is an own-property check for that reason.
+  for (const cookie of ['flash=constructor%3APWNED', 'flash=toString', 'flash=valueOf', 'flash=nope']) {
+    const body = await (await fetch(`${base}/invoices`, { headers: { cookie } })).text();
+    assert.ok(!body.includes('PWNED'), `${cookie} must not reach the page`);
+    assert.ok(!body.includes('[object Object]'), `${cookie} must not reach the page`);
+    assert.ok(!body.includes('role="status"'), `${cookie} must not render a banner at all`);
+  }
 });

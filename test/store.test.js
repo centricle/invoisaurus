@@ -1,17 +1,14 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-
-// The store resolves DATA_DIR at import time, so the environment must be set
-// before it is loaded.
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'invoisaurus-store-'));
-process.env.INVOISAURUS_DATA_DIR = dir;
-const store = await import('../src/store.js');
+// Must precede any src import: it binds INVOISAURUS_DATA_DIR before config.js
+// resolves it. See test/tmpdir.js.
+import { DATA_DIR } from './tmpdir.js';
+import * as store from '../src/store.js';
 
 beforeEach(() => {
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(DATA_DIR, { recursive: true, force: true });
   store.ensureDataDir();
 });
 
@@ -96,7 +93,7 @@ test('an unsafe invoice id never reaches the filesystem', () => {
   // The backstop behind the router's check. An id is a filename, and it arrives
   // from a URL parameter that Express percent-decodes and from a vendor prefix
   // that a human types.
-  const outside = path.join(dir, '..', 'invoisaurus-escaped.json');
+  const outside = path.join(DATA_DIR, '..', 'invoisaurus-escaped.json');
   for (const id of ['../invoisaurus-escaped', 'a/b', 'x%2fy', '  ', '']) {
     assert.throws(() => store.getInvoice(id), /Unsafe invoice id/, JSON.stringify(id));
   }
@@ -133,6 +130,39 @@ test('creating an invoice refuses to write over an existing one', () => {
 test('a malformed data file is reported, not silently replaced', () => {
   // Returning [] for unreadable JSON would let the next save overwrite records
   // that are still on disk. Losing invoices is worse than a loud failure.
-  fs.writeFileSync(path.join(dir, 'clients.json'), '{"truncated": ');
+  fs.writeFileSync(path.join(DATA_DIR, 'clients.json'), '{"truncated": ');
+  assert.throws(() => store.listClients(), /Corrupt data file/);
+});
+
+
+test('a damaged invoice file is set aside, not thrown and not swallowed', () => {
+  const vendor = store.createVendor({
+    name: 'ACME Corporation', numberPrefix: 'ACM-', numberPad: 4, nextNumber: 1,
+  });
+  const client = store.createClient(coyote);
+  const { number, id } = store.allocateInvoiceNumber(vendor.id);
+  store.saveInvoice({
+    id, number, vendorId: vendor.id, clientId: client.id, issueDate: '2026-09-02',
+    lineItems: [{ description: 'Discovery', quantityMilli: 1000, rateCents: 15000 }],
+  }, { create: true });
+
+  fs.writeFileSync(path.join(DATA_DIR, 'invoices', 'ACM-0002.json'), '{"id": "ACM-000');
+
+  const { invoices, unreadable } = store.scanInvoices();
+  assert.equal(invoices.length, 1, 'the readable invoice is still returned');
+  assert.equal(invoices[0].id, 'ACM-0001');
+  assert.equal(unreadable.length, 1, 'and the damaged one is reported rather than dropped');
+  assert.equal(unreadable[0].file, 'ACM-0002.json');
+  assert.match(unreadable[0].message, /Corrupt data file/);
+
+  assert.equal(store.listInvoices().length, 1, 'listInvoices is the readable ones');
+  assert.equal(store.invoiceCountForClient(client.id), 1);
+});
+
+test('a damaged registry file is still a hard failure', () => {
+  // One invoice among hundreds can be set aside. Losing the client registry
+  // cannot: every invoice on disk points into it, and a save over an empty
+  // list would take the rest with it.
+  fs.writeFileSync(path.join(DATA_DIR, 'clients.json'), 'not json');
   assert.throws(() => store.listClients(), /Corrupt data file/);
 });
