@@ -120,7 +120,11 @@ invoicesRouter.get('/new', (req, res) => {
   const vendors = listVendors();
   const client = clients.find((c) => c.id === req.query.clientId);
 
-  if (!client) return res.render('invoices/pick-client', { clients, vendors });
+  // No vendors is the same kind of dead end as no clients, and it arrives first
+  // on a fresh install that skipped the seed. Without this the editor opened
+  // with an empty "Issued by" dropdown and the only feedback was a 422 after
+  // the whole form had been filled in.
+  if (!vendors.length || !client) return res.render('invoices/pick-client', { clients, vendors });
 
   const invoice = makeInvoice({
     vendorId: req.query.vendorId || vendors[0]?.id || '',

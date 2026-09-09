@@ -3,7 +3,16 @@
 <h1 class="mb-2 text-2xl font-semibold tracking-tight text-slate-100">New Invoice</h1>
 <p class="mb-8 text-sm text-slate-500">Choose who this is for.</p>
 
-<% if (!clients.length) { %>
+<%# An invoice needs both an issuing entity and someone to bill. The vendor is
+    asked for first because it is the one that carries the number series, so
+    nothing can be issued without it. %>
+<% if (!vendors.length) { %>
+  <div class="rounded-lg border border-dashed border-slate-800 px-6 py-16 text-center">
+    <p class="text-sm text-slate-400">No vendors yet.</p>
+    <p class="mt-1 text-xs text-slate-500">A vendor is the entity that issues the invoice and owns its number series.</p>
+    <a href="/vendors/new" class="mt-3 inline-block text-sm text-sky-400 hover:underline">Add a vendor</a>
+  </div>
+<% } else if (!clients.length) { %>
   <div class="rounded-lg border border-dashed border-slate-800 px-6 py-16 text-center">
     <p class="text-sm text-slate-400">No clients yet.</p>
     <a href="/clients/new" class="mt-3 inline-block text-sm text-sky-400 hover:underline">Add a client</a>

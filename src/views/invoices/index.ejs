@@ -37,7 +37,11 @@
     <p class="text-sm text-slate-400">
       <%= clientFilter || statusFilter ? 'No invoices match that filter.' : 'No invoices yet.' %>
     </p>
-    <% if (!clients.length) { %>
+    <%# Same order as the New Invoice flow: the vendor issues the number, so it
+        is what is missing first on an install that skipped the seed. %>
+    <% if (!vendors.length) { %>
+      <a href="/vendors/new" class="mt-3 inline-block text-sm text-sky-400 hover:underline">Add a vendor first</a>
+    <% } else if (!clients.length) { %>
       <a href="/clients/new" class="mt-3 inline-block text-sm text-sky-400 hover:underline">Add a client first</a>
     <% } %>
   </div>

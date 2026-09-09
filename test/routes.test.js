@@ -157,6 +157,29 @@ test('the vendor picker disappears once the invoice exists', async () => {
 });
 
 
+test('a fresh install is told what it is missing before it fills in a form', async () => {
+  // With no vendors the editor used to open on an empty "Issued by" dropdown
+  // and say nothing until a 422 came back with the whole form filled in. The
+  // vendor is asked for first because it owns the number series.
+  fs.rmSync(DATA_DIR, { recursive: true, force: true });
+  store.ensureDataDir();
+
+  let body = await (await fetch(`${base}/invoices/new`)).text();
+  assert.ok(body.includes('No vendors yet'), 'the vendor is the first thing missing');
+  assert.ok(body.includes('/vendors/new'));
+
+  const onlyVendor = store.createVendor(ACME);
+  body = await (await fetch(`${base}/invoices/new`)).text();
+  assert.ok(body.includes('No clients yet'), 'then the client');
+  assert.ok(body.includes('/clients/new'));
+
+  // A clientId cannot conjure a vendor into existence either.
+  const someClient = store.createClient(COYOTE);
+  body = await (await fetch(`${base}/invoices/new?clientId=${someClient.id}`)).text();
+  assert.ok(body.includes('name="vendorId"') || body.includes('ACME Corporation'));
+  assert.equal(store.getVendor(onlyVendor.id).nextNumber, 1, 'nothing was allocated by looking');
+});
+
 test('creating an invoice allocates a number and freezes the snapshot', async () => {
   const res = await post('/invoices', {
     vendorId: vendor.id,
