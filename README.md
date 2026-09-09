@@ -130,11 +130,12 @@ Plain JSON, one record per file for invoices, human-readable and greppable
 without the app. Writes are atomic (temp file plus rename), so an interrupted
 save cannot leave a half-written invoice.
 
-If an invoice file will not parse anyway, the list names it and marks it
-unreadable rather than either hiding it or refusing to render. One damaged file
-should not conceal the other two hundred, and an invoice that quietly stops
-appearing is an invoice nobody chases. The two registry files are the
-exception: they fail loudly, because every invoice on disk points into them.
+If a file in `invoices/` will not parse, or parses into something that is not an
+invoice, the list names it and marks it unreadable rather than either hiding it
+or refusing to render. One damaged file should not conceal the other two
+hundred, and an invoice that quietly stops appearing is an invoice nobody
+chases. The two registry files are the exception: they fail loudly, because
+every invoice on disk points into them.
 
 Backing it up is up to you. `npm run data:commit` exists for one specific setup:
 a data directory that is itself a git repo. It stages and commits everything in

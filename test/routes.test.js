@@ -231,6 +231,36 @@ test('one unreadable file does not take the invoice list down with it', async ()
   assert.ok(!body.includes('Corrupt data file'), 'the raw parse error is not rendered');
 });
 
+test('a file that parses but is not an invoice does not take the list down', async () => {
+  // The unreadable guard used to catch only files that would not parse. `{}`
+  // parses, reached invoiceTotals, and turned the list into a 500 -- so a
+  // half-finished hand edit took out the page that was supposed to report it.
+  const good = seedInvoice();
+  for (const [file, body] of Object.entries({
+    'ACM-0002.json': '{}',
+    'ACM-0003.json': '[]',
+    'ACM-0004.json': 'null',
+  })) {
+    fs.writeFileSync(path.join(DATA_DIR, 'invoices', file), body);
+  }
+
+  const res = await fetch(`${base}/invoices`);
+  assert.equal(res.status, 200, 'a wrong-shaped file is not a 500 either');
+
+  const body = await res.text();
+  assert.ok(body.includes(good.id), 'the readable invoices still render');
+  for (const file of ['ACM-0002.json', 'ACM-0003.json', 'ACM-0004.json']) {
+    assert.ok(body.includes(file), `${file} is named on the page`);
+  }
+  assert.ok(body.includes('3 unreadable'), 'and counted in the footer');
+});
+
+test('the editor and the PDF route 404 on a file that is not a record', async () => {
+  fs.writeFileSync(path.join(DATA_DIR, 'invoices', 'ACM-0007.json'), '{"id":"ACM-0007"}');
+  assert.equal((await fetch(`${base}/invoices/ACM-0007`)).status, 404);
+  assert.equal((await fetch(`${base}/invoices/ACM-0007/pdf`)).status, 404);
+});
+
 test('the PDF route serves the real document, inline or as a download', async () => {
   const invoice = seedInvoice();
 

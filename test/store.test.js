@@ -159,6 +159,49 @@ test('a damaged invoice file is set aside, not thrown and not swallowed', () => 
   assert.equal(store.invoiceCountForClient(client.id), 1);
 });
 
+test('a file that parses but is not an invoice is set aside too', () => {
+  // Parsing and shape are different questions. Each of these is valid JSON, and
+  // each one used to reach the list as though it were a record: invoiceTotals
+  // called .map on a missing lineItems and 500'd the whole page, which is the
+  // outcome scanInvoices exists to prevent.
+  const vendor = store.createVendor({ name: 'ACME Corporation', numberPrefix: 'ACM-', nextNumber: 1 });
+  const { number, id } = store.allocateInvoiceNumber(vendor.id);
+  store.saveInvoice({
+    id, number, vendorId: vendor.id, clientId: 'coyote', issueDate: '2026-09-02',
+    lineItems: [{ description: 'Discovery', quantityMilli: 1000, rateCents: 15000 }],
+  }, { create: true });
+
+  const junk = {
+    'shape-object.json': '{}',
+    'shape-array.json': '[]',
+    'shape-string.json': '"oops"',
+    'shape-null.json': 'null',
+    'shape-number.json': '7',
+    'shape-no-items.json': '{"id":"X-1","issueDate":"2026-09-02"}',
+    'shape-null-item.json': '{"id":"X-2","issueDate":"2026-09-02","lineItems":[null]}',
+  };
+  for (const [file, body] of Object.entries(junk)) {
+    fs.writeFileSync(path.join(DATA_DIR, 'invoices', file), body);
+  }
+
+  const { invoices, unreadable } = store.scanInvoices();
+  assert.equal(invoices.length, 1, 'the real invoice is still the only invoice');
+  assert.equal(invoices[0].id, id);
+  assert.deepEqual(
+    unreadable.map((u) => u.file).sort(),
+    Object.keys(junk).sort(),
+    'every one of them is named on the page rather than dropped or thrown',
+  );
+});
+
+test('an id whose file is not an invoice reads as no invoice at all', () => {
+  // The editor and the PDF route both dereference what getInvoice hands back.
+  // A 404 is the honest answer for a file this app did not write; the list is
+  // where the file gets named and explained.
+  fs.writeFileSync(path.join(DATA_DIR, 'invoices', 'ACM-0001.json'), '{}');
+  assert.equal(store.getInvoice('ACM-0001'), null);
+});
+
 test('a damaged registry file is still a hard failure', () => {
   // One invoice among hundreds can be set aside. Losing the client registry
   // cannot: every invoice on disk points into it, and a save over an empty

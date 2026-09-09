@@ -173,7 +173,30 @@ function invoicePath(id) {
 }
 
 /**
- * Read every invoice, separating out the ones that would not parse.
+ * The fields every reader of an invoice dereferences without guarding first.
+ *
+ * Parsing is not the same question as shape. `{}`, `[]`, `"oops"` and `null`
+ * are all valid JSON, and each one reached the list as though it were a record:
+ * `invoiceTotals` called `.map` on a missing `lineItems` and turned the whole
+ * page into a 500, which is the outcome scanInvoices exists to prevent. The
+ * data directory is documented as hand-editable, so a half-finished edit or a
+ * stray file is an ordinary event rather than an exotic one.
+ *
+ * Only the three fields that crash on absence are checked. `status` falls back
+ * through statusBadgeClass, `dueDate` compares false when missing, and the
+ * snapshot blocks are already read defensively -- guarding those here would be
+ * validation, which is a different job and belongs in schema.js.
+ */
+const isInvoiceShaped = (value) => Boolean(value)
+  && typeof value === 'object'
+  && !Array.isArray(value)
+  && typeof value.id === 'string'
+  && typeof value.issueDate === 'string'
+  && Array.isArray(value.lineItems)
+  && value.lineItems.every((li) => Boolean(li) && typeof li === 'object');
+
+/**
+ * Read every invoice, separating out the ones that are not usable records.
  *
  * A registry file that will not parse is a whole-app problem, and readJson
  * throws for it. One invoice among hundreds is not the same event. Refusing to
@@ -193,8 +216,13 @@ export function scanInvoices() {
   for (const file of fs.readdirSync(INVOICE_DIR).filter((f) => f.endsWith('.json'))) {
     try {
       const invoice = readJson(path.join(INVOICE_DIR, file), null);
-      // null only if the file vanished between the readdir and the read.
-      if (invoice) invoices.push(invoice);
+      if (isInvoiceShaped(invoice)) invoices.push(invoice);
+      // A file that vanished between the readdir and the read reads as null and
+      // is simply gone; anything else that parsed is a file in the invoice
+      // directory that is not an invoice, and someone has to be told about it.
+      else if (invoice !== null || fs.existsSync(path.join(INVOICE_DIR, file))) {
+        unreadable.push({ file, message: 'Not an invoice record.' });
+      }
     } catch (err) {
       unreadable.push({ file, message: err.message });
     }
@@ -209,7 +237,18 @@ export function scanInvoices() {
  *  to anyone want this; the invoice list itself wants `scanInvoices`. */
 export const listInvoices = () => scanInvoices().invoices;
 
-export const getInvoice = (id) => readJson(invoicePath(id), null);
+/**
+ * One invoice, or null when there is no usable record at that id.
+ *
+ * A file that parses but is not shaped like an invoice is not a record this
+ * app wrote, so it gets the same answer a missing file gets rather than
+ * crashing the editor and the PDF route. The invoice list is where a damaged
+ * file is named and explained; this is only the path that stops a 500.
+ */
+export function getInvoice(id) {
+  const invoice = readJson(invoicePath(id), null);
+  return isInvoiceShaped(invoice) ? invoice : null;
+}
 
 /**
  * Write an invoice. `create` refuses to write over a file that already exists.
