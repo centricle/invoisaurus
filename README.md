@@ -149,8 +149,7 @@ none, works the same as far as the app is concerned.
 npm test
 ```
 
-101 tests on Node's built-in runner. No test dependencies, no config, no watch
-mode to learn.
+Node's built-in runner. No test dependencies, no config, no watch mode to learn.
 
 Every test file binds `INVOISAURUS_DATA_DIR` to a fresh temporary directory before
 it loads anything from `src/`, so the suite cannot reach your records even by
@@ -173,7 +172,7 @@ every pull request, against the Node version pinned in `.nvmrc`.
 | `src/lib/pdf/` | `layout.js` decides where things go, `generate.js` draws them |
 | `src/routes/` | One router each for invoices, clients, vendors |
 | `src/views/` | EJS templates |
-| `public/js/` | Browser-side behavior: the invoice editor, and the number steppers every form uses |
+| `public/js/` | Browser-side behavior: the invoice editor, and the number steppers on the vendor and invoice forms |
 
 Express 5, EJS, Tailwind 4 via the CLI, pdf-lib. Line-item arithmetic is vanilla
 JS in the browser; everything else is a form POST. No bundler, no client

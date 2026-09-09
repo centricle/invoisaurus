@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+// Binds INVOISAURUS_DATA_DIR before config.js resolves it. See test/tmpdir.js.
+// Nothing here reaches the store today; the import is what keeps that from
+// being the reason, as tmpdir.js explains.
+import './tmpdir.js';
 import { ejsEngine } from '../src/viewEngine.js';
 
 const render = (file, data) => new Promise((resolve, reject) => {
