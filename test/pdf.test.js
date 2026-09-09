@@ -139,6 +139,64 @@ test('no page is filled past the bottom margin', async () => {
   }
 });
 
+test('a line item taller than a whole page is split, not drawn off the page', async () => {
+  // Pagination moves a row that does not fit onto the next page, but a row
+  // taller than a page has no page to move to: the `current.length` guard that
+  // stops an infinite run of empty pages also placed it regardless of height,
+  // and it was drawn straight through the bottom margin. The sweep below only
+  // used short descriptions, so nothing caught it.
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+
+  const huge = line('word '.repeat(400), '2', '150');
+  const { pages, firstHeader, contHeader, capacityOf, totalCents } = planPages(
+    invoiceWith([huge]), { font, bold },
+  );
+
+  assert.ok(pages.length > 1, 'the row needed more than one page');
+  pages.forEach((rows, i) => {
+    const used = rows.reduce((sum, r) => sum + r.height, 0);
+    const available = capacityOf(i === 0 ? firstHeader : contHeader);
+    assert.ok(used <= available, `page ${i + 1} overflows: ${used} > ${available}`);
+  });
+
+  // Splitting must not turn one charge into several.
+  assert.equal(totalCents, 30000, 'the split row is still billed once');
+  const priced = pages.flat().filter((r) => r.amount);
+  assert.equal(priced.length, 1, 'only the first piece carries the numbers');
+  assert.equal(priced[0].amount, '$300.00');
+  assert.equal(priced[0].quantity, '2');
+});
+
+test('a split row keeps every word of its description', async () => {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+
+  // Distinct tokens, so a dropped or duplicated chunk is visible.
+  const words = Array.from({ length: 900 }, (_, i) => `w${i}`).join(' ');
+  const { pages } = planPages(invoiceWith([line(words)]), { font, bold });
+
+  const drawn = pages.flat().flatMap((r) => r.lines).join(' ').split(/\s+/).filter(Boolean);
+  assert.deepEqual(drawn, words.split(' '), 'no word is lost or repeated across the break');
+});
+
+test('a document with an oversized row still renders', async () => {
+  const bytes = await generateInvoicePdf(invoiceWith([
+    line('Preamble'),
+    line('word '.repeat(400), '2', '150'),
+    line('Postscript'),
+  ]));
+  const doc = await PDFDocument.load(bytes);
+  assert.ok(doc.getPageCount() >= 2);
+
+  const text = pdfText(bytes);
+  assert.ok(text.includes('Preamble'));
+  assert.ok(text.includes('Postscript'));
+  assert.ok(text.includes('Amount Due'));
+});
+
 test('long-form dates never collide with their metadata labels', async () => {
   // The header labels sat at the line-item rate column until dates became
   // long-form. "September 30, 2026" is wide enough that the value ran into the

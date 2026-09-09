@@ -139,6 +139,23 @@ export const rowHeight = (lineCount) =>
   Math.max(ROW.minHeight, textBlockHeight(lineCount) + 2 * ROW.padding);
 
 /**
+ * The inverse of `rowHeight`: the most description lines that fit in `height`.
+ *
+ * Pagination normally moves a row that does not fit onto the next page whole,
+ * which is right for every row that fits on a page at all. A description long
+ * enough to be taller than a whole page has no next page to move to, and was
+ * simply drawn past the bottom margin -- silently, because the PDF renders
+ * either way. Splitting it needs this measurement.
+ *
+ * Zero when not even a single-line row fits.
+ */
+export function linesThatFit(height, size = SIZE.body, leading = LEADING.body) {
+  if (height < rowHeight(1)) return 0;
+  const block = height - 2 * ROW.padding - (METRICS.cap + METRICS.descender) * size;
+  return Math.max(1, Math.floor(block / leading) + 1);
+}
+
+/**
  * Baseline of a row's first line so the block sits centered in its box.
  *
  * Rows were previously drawn from the top with a fixed pad, which left the text

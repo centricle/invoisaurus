@@ -17,7 +17,7 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import {
   PAGE, CONTENT, SIZE, LEADING, COLUMNS, TOTALS_HEIGHT, META,
-  wrapText, rowHeight, sanitize, firstBaselineY,
+  wrapText, rowHeight, sanitize, firstBaselineY, linesThatFit,
 } from './layout.js';
 import { formatUSD, formatQuantity, lineAmountCents } from '../../money.js';
 import { addressLines, termById, formatLongDate } from '../../schema.js';
@@ -113,12 +113,14 @@ export function planPages(invoice, { font, bold }) {
 
   const items = invoice.lineItems.map((li) => {
     const lines = wrapText(li.description, font, SIZE.body, COLUMNS.description.width);
+    const amountCents = lineAmountCents(li.quantityMilli, li.rateCents);
     return {
       lines,
       height: rowHeight(lines.length),
       quantity: formatQuantity(li.quantityMilli),
       rate: li.rateCents == null ? '' : formatUSD(li.rateCents),
-      amountCents: lineAmountCents(li.quantityMilli, li.rateCents),
+      amount: formatUSD(amountCents),
+      amountCents,
     };
   });
 
@@ -132,15 +134,51 @@ export function planPages(invoice, { font, bold }) {
   const pages = [];
   let current = [];
   let remaining = capacityOf(firstHeader);
+  const fullPage = capacityOf(contHeader);
+
+  const breakPage = () => {
+    pages.push(current);
+    current = [];
+    remaining = fullPage;
+  };
 
   for (const item of items) {
-    if (item.height > remaining && current.length) {
-      pages.push(current);
-      current = [];
-      remaining = capacityOf(contHeader);
+    // The ordinary case: a row that does not fit in what is left moves to the
+    // next page whole rather than being broken across the boundary.
+    if (item.height > remaining && current.length) breakPage();
+
+    if (item.height <= remaining) {
+      current.push(item);
+      remaining -= item.height;
+      continue;
     }
-    current.push(item);
-    remaining -= item.height;
+
+    // It still does not fit and the page is already empty, so there is no next
+    // page to move it to -- this row is taller than the space a page can give
+    // it. Splitting is the only option that neither drops billed text nor
+    // draws it below the bottom margin, and it is what the `current.length`
+    // guard above quietly skipped: the row was placed at full height anyway.
+    //
+    // The numbers ride on the first piece, where the description starts.
+    // Continuation pieces carry description only, because a quantity and an
+    // amount repeated under themselves read as a second charge.
+    let rest = item.lines;
+    let first = true;
+    while (rest.length) {
+      const take = Math.max(1, linesThatFit(remaining));
+      const lines = rest.slice(0, take);
+      rest = rest.slice(take);
+      current.push({
+        lines,
+        height: rowHeight(lines.length),
+        quantity: first ? item.quantity : '',
+        rate: first ? item.rate : '',
+        amount: first ? item.amount : '',
+      });
+      remaining -= rowHeight(lines.length);
+      first = false;
+      if (rest.length) breakPage();
+    }
   }
   pages.push(current);
 
@@ -211,7 +249,7 @@ export async function generateInvoicePdf(invoice) {
       });
       draw(page, at(item.quantity, { right: COLUMNS.quantity.right, y: baseline }));
       draw(page, at(item.rate, { right: COLUMNS.rate.right, y: baseline }));
-      draw(page, at(formatUSD(item.amountCents), { right: COLUMNS.amount.right, y: baseline }));
+      draw(page, at(item.amount, { right: COLUMNS.amount.right, y: baseline }));
 
       y -= item.height;
       rule(page, y);
