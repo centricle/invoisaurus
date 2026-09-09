@@ -261,6 +261,26 @@ test('the editor and the PDF route 404 on a file that is not a record', async ()
   assert.equal((await fetch(`${base}/invoices/ACM-0007/pdf`)).status, 404);
 });
 
+test('a server error explains itself without printing a filesystem path', async () => {
+  // The 500 handler rendered 404.ejs, which appends "not found" to whatever it
+  // is given -- so the page read "Something broke: <error> not found." It also
+  // put the absolute path of the offending file on screen, which is a username
+  // in every screenshot and the reason the footer shows the data dir as `~`.
+  fs.writeFileSync(path.join(DATA_DIR, 'clients.json'), 'not json');
+
+  const res = await fetch(`${base}/clients`);
+  assert.equal(res.status, 500);
+
+  const body = await res.text();
+  assert.ok(!body.includes('not found'), 'the 404 template is not doing this job');
+  assert.ok(!body.includes('Corrupt data file'), 'the raw error stays out of the page');
+  // The footer prints the data directory by design, home-relative so it does
+  // not carry a username. What must not appear is the path the *error* names.
+  assert.ok(!body.includes('clients.json'), 'and so does the file it names');
+  assert.ok(body.includes('Something broke'), 'but the reader is still told what happened');
+  assert.ok(body.includes('terminal'), 'and where the detail actually is');
+});
+
 test('the PDF route serves the real document, inline or as a download', async () => {
   const invoice = seedInvoice();
 

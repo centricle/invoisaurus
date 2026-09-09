@@ -59,9 +59,13 @@ app.use('/vendors', vendorsRouter);
 
 app.use((req, res) => res.status(404).render('404', { what: 'Page' }));
 
+// Rendering 404.ejs here produced "Something broke: <error> not found.", since
+// that template appends "not found" to whatever it is handed. The error also
+// carried an absolute path straight onto the page. Both are why this has a
+// template of its own.
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).render('404', { what: `Something broke: ${err.message}` });
+  res.status(500).render('500');
 });
 
 // Bind a port only when this file is the entry point. Importing it -- which the
