@@ -22,7 +22,7 @@
   function parseScaled(input, scale) {
     if (input == null) return null;
     const raw = String(input).trim().replace(/[$,\s]/g, '');
-    if (raw === '' || !/^-?\d*\.?\d*$/.test(raw) || raw === '.' || raw === '-') return null;
+    if (!/^-?(?:\d+\.?\d*|\.\d+)$/.test(raw)) return null;
     const negative = raw.startsWith('-');
     const [whole = '0', frac = ''] = raw.replace(/^-/, '').split('.');
     const digits = String(scale).length - 1;

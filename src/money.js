@@ -35,7 +35,11 @@ function roundHalfUp(n) {
 export function parseScaled(input, scale) {
   if (input == null) return null;
   const raw = String(input).trim().replace(/[$,\s]/g, '');
-  if (raw === '' || !/^-?\d*\.?\d*$/.test(raw) || raw === '.' || raw === '-') return null;
+  // At least one digit is required on one side of the point. A pattern of
+  // `\d*\.?\d*` matches "", ".", "-" and "-." as well, and the first three were
+  // caught by hand while "-." fell through to `Number("") * scale` and returned
+  // -0 -- a rate that then passed every "is it missing" check and billed $0.00.
+  if (!/^-?(?:\d+\.?\d*|\.\d+)$/.test(raw)) return null;
 
   const negative = raw.startsWith('-');
   const [whole = '0', frac = ''] = raw.replace(/^-/, '').split('.');

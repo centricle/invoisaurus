@@ -27,6 +27,23 @@ test('parseCents returns null for empty and garbage, never 0', () => {
   assert.equal(parseCents(null), null);
 });
 
+test('a value with no digit in it is not a number', () => {
+  // "-." matched the old `-?\d*\.?\d*` pattern and was not one of the three
+  // shapes rejected by hand, so it reached `Number("") * scale` and returned
+  // -0. A rate of -0 is not null, so it survived the blank-row filter and
+  // every "is this missing" check, and billed the line at $0.00.
+  for (const input of ['-.', '.', '-', '-.-', '..', '$', '-$']) {
+    assert.equal(parseCents(input), null, `parseCents(${JSON.stringify(input)})`);
+    assert.equal(parseQuantity(input), null, `parseQuantity(${JSON.stringify(input)})`);
+  }
+
+  // A point on either side of the digits is still a number, and stays one.
+  assert.equal(parseCents('.5'), 50);
+  assert.equal(parseCents('-.5'), -50);
+  assert.equal(parseCents('5.'), 500);
+  assert.equal(parseCents('-5.'), -500);
+});
+
 test('line amounts stay exact where floats would not', () => {
   // 0.1 * 15000 in float arithmetic is 1500.0000000000002.
   assert.equal(lineAmountCents(parseQuantity('0.1'), parseCents('150')), 1500);
