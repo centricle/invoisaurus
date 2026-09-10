@@ -8,7 +8,7 @@
  *
  * Run once after install to get a populated app to look at. Everything it
  * creates is fictional and safe to delete -- see `--remove` below, and the
- * "Demo data" section of the README.
+ * "Seed data" section of the README.
  *
  *   node scripts/seed.mjs            create the demo records (idempotent)
  *   node scripts/seed.mjs --remove   clear them again
