@@ -20,7 +20,13 @@
  * banner; `toString` renders "[object Object]". Escaped either way, so not
  * markup injection -- but "a code from the fixed set" has to mean the set.
  */
+import { BASE_PATH } from './config.js';
+
 const COOKIE = 'flash';
+// Scoped to where the app is mounted. Set at '/' while the app lives under
+// a prefix, the browser would return it to the parent site too, and
+// clearCookie at a different path silently fails to clear anything.
+const COOKIE_PATH = BASE_PATH || '/';
 
 const MESSAGES = {
   'invoice-created': (id) => `Invoice ${id} created.`,
@@ -35,7 +41,7 @@ const MESSAGES = {
 export function setFlash(res, code, arg = '') {
   if (!Object.hasOwn(MESSAGES, code)) throw new Error(`Unknown flash code: ${code}`);
   res.cookie(COOKIE, arg ? `${code}:${arg}` : code, {
-    path: '/', httpOnly: true, sameSite: 'lax', maxAge: 30_000,
+    path: COOKIE_PATH, httpOnly: true, sameSite: 'lax', maxAge: 30_000,
   });
 }
 
@@ -45,7 +51,7 @@ export function takeFlash(req, res) {
   const entry = raw.split(';').map((s) => s.trim()).find((s) => s.startsWith(`${COOKIE}=`));
   if (!entry) return '';
 
-  res.clearCookie(COOKIE, { path: '/' });
+  res.clearCookie(COOKIE, { path: COOKIE_PATH });
 
   const value = decodeURIComponent(entry.slice(COOKIE.length + 1));
   const separator = value.indexOf(':');

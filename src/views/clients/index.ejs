@@ -2,7 +2,7 @@
 
 <div class="mb-8 flex items-end justify-between">
   <h1 class="text-2xl font-semibold tracking-tight text-slate-100">Clients</h1>
-  <a href="/clients/new" class="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500">New Client</a>
+  <a href="<%= u('/clients/new') %>" class="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500">New Client</a>
 </div>
 
 <% if (!clients.length) { %>
@@ -24,7 +24,7 @@
       <% clients.forEach((c) => { %>
         <tr class="hover:bg-slate-900/50">
           <td class="py-3">
-            <a href="/clients/<%= c.id %>/edit" class="text-sky-400 hover:underline"><%= clientLabel(c) %></a>
+            <a href="<%= u('/clients/' + (c.id) + '/edit') %>" class="text-sky-400 hover:underline"><%= clientLabel(c) %></a>
           </td>
           <td class="py-3 text-slate-400"><%= c.name %></td>
           <td class="py-3 text-slate-400"><%= c.contactName || '—' %></td>

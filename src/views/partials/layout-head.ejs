@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %> · Invoisaurus</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/css/dist/app.css">
+  <link rel="icon" href="<%= u('/favicon.svg') %>" type="image/svg+xml">
+  <link rel="stylesheet" href="<%= u('/css/dist/app.css') %>">
 </head>
 <body class="h-full bg-slate-950 text-slate-200 antialiased">
   <header class="border-b border-slate-800">
     <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-      <a href="/" class="flex items-center gap-2 text-sm font-semibold tracking-tight text-slate-100">
-        <!-- Inlined rather than <img src="/favicon.svg">, so the mark inherits
+      <a href="<%= u('/') %>" class="flex items-center gap-2 text-sm font-semibold tracking-tight text-slate-100">
+        <!-- Inlined rather than <img src="<%= u('/favicon.svg') %>">, so the mark inherits
              currentColor and sizes in rem alongside the root scale. -->
         <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -26,7 +26,7 @@
           const navItems = [['invoices', 'Invoices'], ['clients', 'Clients'], ['vendors', 'Vendors']];
         %>
         <% navItems.forEach(([href, label]) => { %>
-          <a href="/<%= href %>"
+          <a href="<%= u('/' + (href)) %>"
              class="<%= section === href ? 'text-slate-100 font-medium' : 'text-slate-400 hover:text-slate-100' %>"
              <%- section === href ? 'aria-current="page"' : '' %>><%= label %></a>
         <% }) %>

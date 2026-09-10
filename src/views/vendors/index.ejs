@@ -2,7 +2,7 @@
 
 <div class="mb-2 flex items-end justify-between">
   <h1 class="text-2xl font-semibold tracking-tight text-slate-100">Vendors</h1>
-  <a href="/vendors/new" class="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500">New Vendor</a>
+  <a href="<%= u('/vendors/new') %>" class="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500">New Vendor</a>
 </div>
 <p class="mb-8 text-sm text-slate-500">The entities that issue invoices. Each keeps its own number series.</p>
 
@@ -23,7 +23,7 @@
     <tbody class="divide-y divide-slate-900">
       <% vendors.forEach((v) => { %>
         <tr class="hover:bg-slate-900/50">
-          <td class="py-3"><a href="/vendors/<%= v.id %>/edit" class="text-sky-400 hover:underline"><%= v.name %></a></td>
+          <td class="py-3"><a href="<%= u('/vendors/' + (v.id) + '/edit') %>" class="text-sky-400 hover:underline"><%= v.name %></a></td>
           <td class="py-3 text-slate-400"><%= v.email || '—' %></td>
           <td class="py-3 text-slate-400"><%= [v.address.city, v.address.state].filter(Boolean).join(', ') || '—' %></td>
           <td class="py-3 text-right font-mono text-slate-400"><%= formatInvoiceNumber(v, v.nextNumber) %></td>
