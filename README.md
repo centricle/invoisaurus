@@ -132,7 +132,27 @@ never needs it.
 
 `netlify.toml` describes the deployment: the Express app runs as a single
 Netlify function, and `public/` is staged into `dist/` so the CDN serves the
-static assets. To reproduce the build the way CI runs it:
+static assets.
+
+**Nothing in it is specific to this project's own site.** Point a Netlify
+project at a fork and you get a working demo at the root of your own domain,
+configuring nothing. Demo mode is asserted by the function rather than left to
+an environment variable, because a public deploy of this that *wasn't* in demo
+mode would be an unauthenticated invoice editor writing to a read-only disk.
+
+To serve it under a path prefix instead, set `BASE_PATH` as a project
+environment variable rather than editing the repo:
+
+```sh
+netlify env:set BASE_PATH "/some/prefix"
+```
+
+That reaches both the build, which stages the assets into a matching directory,
+and the function at runtime. A variable set in `netlify.toml`'s
+`[build.environment]` would reach only the build, and the app would then serve
+at the root while its assets sat one directory down.
+
+To reproduce the build the way CI runs it:
 
 ```sh
 npx netlify build
