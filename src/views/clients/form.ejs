@@ -14,7 +14,7 @@
   </p>
 <% } %>
 
-<form method="post" action="<%= isNew ? '/clients' : `/clients/${client.id}` %>" class="max-w-2xl space-y-6">
+<form method="post" action="<%= u(isNew ? '/clients' : `/clients/${client.id}`) %>" class="max-w-2xl space-y-6">
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
     <%- field('name', 'Legal name', client.name, { className: 'sm:col-span-2', hint: 'Renders on the invoice.' }) %>
     <%- field('displayName', 'Display name', client.displayName, { hint: 'Optional. Used in dropdowns only.' }) %>

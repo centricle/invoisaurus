@@ -41,7 +41,7 @@
 
 <form method="post" data-invoice-form
       data-term-days='<%- JSON.stringify(termDays) %>'
-      action="<%= isNew ? '/invoices' : `/invoices/${invoice.id}` %>" class="space-y-8">
+      action="<%= u(isNew ? '/invoices' : `/invoices/${invoice.id}`) %>" class="space-y-8">
 
   <input type="hidden" name="clientId" value="<%= invoice.clientId %>">
 

@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import './tmpdir.js';
+// Demo mode, for its seeded records rather than for itself: the pages that
+// matter most here are the edit forms, and an empty data directory has no
+// record to open one for. That is what let three broken form actions through
+// -- the only pages under test were the empty index screens.
+import './demomode.js';
 
 /**
  * The app mounted under a prefix, as the hosted demo runs it.
@@ -52,16 +57,53 @@ test('every route answers under the prefix and nowhere else', async () => {
   });
 });
 
+/**
+ * Every page that renders a URL, not a hand-picked few.
+ *
+ * The original list was the four index pages, and it missed every form: three
+ * `<form action>` attributes were built as `<%= isNew ? '/clients' : ... %>`,
+ * which the prefixing pass skipped because the value starts with an EJS
+ * expression rather than a slash. Saving anything 404'd in production, and the
+ * endpoint tests all passed -- they POSTed to the right URL directly instead of
+ * reading it off the form.
+ *
+ * `/invoices/new` is not enough on its own: with no `?clientId` it renders the
+ * client picker, so the invoice editor was never on screen here at all.
+ */
+async function everyPage(base, get) {
+  const list = await (await get(base, `${PREFIX}/invoices`)).text();
+  const invoiceId = (list.match(/([A-Z]{3}-\d{4})/) || [])[1];
+
+  const clients = await (await get(base, `${PREFIX}/clients`)).text();
+  const clientId = (clients.match(/\/clients\/([a-z0-9-]+)\/edit/) || [])[1];
+
+  const vendors = await (await get(base, `${PREFIX}/vendors`)).text();
+  const vendorId = (vendors.match(/\/vendors\/([a-z0-9-]+)\/edit/) || [])[1];
+
+  return [
+    '/invoices', '/clients', '/vendors',
+    '/invoices/new',                                    // the client picker
+    clientId && `/invoices/new?clientId=${clientId}`,   // the invoice editor, new
+    invoiceId && `/invoices/${invoiceId}`,              // the invoice editor, existing
+    '/clients/new', clientId && `/clients/${clientId}/edit`,
+    '/vendors/new', vendorId && `/vendors/${vendorId}/edit`,
+    '/nope-404',
+  ].filter(Boolean);
+}
+
 test('no page emits a link that escapes the prefix', async () => {
   await withServer(async (base) => {
-    for (const p of ['/invoices', '/clients', '/vendors', '/invoices/new']) {
+    const pages = await everyPage(base, get);
+    assert.ok(pages.length >= 10, `only ${pages.length} pages under test`);
+
+    for (const p of pages) {
       const html = await (await get(base, PREFIX + p)).text();
       const escaped = [...html.matchAll(/(?:href|action|src)="(\/[^"]*)"/g)]
         .map((m) => m[1])
         .filter((href) => !href.startsWith(PREFIX));
 
-      // A single missed link is a visitor sent to the parent site's 404, which
-      // is why these go through one helper rather than being written by hand.
+      // A single missed link is a visitor sent to the parent site's 404 -- or,
+      // for a form action, a save that silently goes nowhere.
       assert.deepEqual(escaped, [], `${p} emitted unprefixed links`);
     }
   });
@@ -115,5 +157,22 @@ test('static assets and the PDF both serve under the prefix', async () => {
       assert.equal(pdf.status, 200);
       assert.equal(pdf.headers.get('content-type'), 'application/pdf');
     }
+  });
+});
+
+test('every form posts back inside the prefix', async () => {
+  await withServer(async (base) => {
+    let checked = 0;
+    for (const p of await everyPage(base, get)) {
+      const html = await (await get(base, PREFIX + p)).text();
+      for (const [, action] of html.matchAll(/<form[^>]*\saction="([^"]*)"/g)) {
+        checked += 1;
+        assert.ok(action.startsWith(PREFIX), `${p} posts to ${action}`);
+      }
+    }
+    // The create and update forms for all three record types, plus delete,
+    // the filter form and the demo reset. If this drops, a page stopped
+    // rendering rather than a form being fixed.
+    assert.ok(checked >= 8, `only ${checked} form actions seen`);
   });
 });

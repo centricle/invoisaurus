@@ -6,7 +6,7 @@
 
 <%- include('../partials/errors') %>
 
-<form method="post" action="<%= isNew ? '/vendors' : `/vendors/${vendor.id}` %>" class="max-w-2xl space-y-6">
+<form method="post" action="<%= u(isNew ? '/vendors' : `/vendors/${vendor.id}`) %>" class="max-w-2xl space-y-6">
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
     <%- field('name', 'Company name', vendor.name, { className: 'sm:col-span-2' }) %>
     <%- field('email', 'Email', vendor.email, { type: 'email', className: 'sm:col-span-2', hint: 'Renders on the invoice as the contact for billing questions.' }) %>
