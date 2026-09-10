@@ -52,8 +52,34 @@ export function parseScaled(input, scale) {
   let value = Number(whole) * scale + Number(kept || '0');
   if (next && Number(next) >= 5) value += 1;
 
+  // Past 2^53 a "number" is no longer an exact integer, so the whole
+  // integer-only premise of this module quietly stops holding: the value is a
+  // float again, arithmetic on it is approximate, and `JSON.stringify` writes
+  // it as `1e+23` -- which parses back as a different number than any invoice
+  // ever contained. Holding a digit key down in the rate field is enough to
+  // reach it, so this is an ordinary typo, not an attack. Reject rather than
+  // clamp: a silently capped rate is a wrong invoice that looks right.
+  if (!Number.isSafeInteger(value)) return null;
+
   return negative ? -value : value;
 }
+
+/**
+ * The largest line amount or total this app will accept, in cents: $1 billion.
+ *
+ * `parseScaled` already refuses anything outside safe-integer range, which is
+ * the correctness floor -- past it a "number" stops being an exact integer and
+ * the premise at the top of this file collapses. This is a second, much lower
+ * ceiling, and it exists for a different reason: safe-integer range tops out
+ * near ninety trillion dollars, so a rate that is nine orders of magnitude too
+ * large still parses cleanly and produces an invoice that merely looks wrong.
+ * A bound a human would recognize as absurd turns that into an error message.
+ *
+ * It also keeps `lineAmountCents` honest. Its multiply is exact only below
+ * 2^53, and quantity x rate can cross that line while both operands are
+ * individually fine, so the product is what has to be checked, not the inputs.
+ */
+export const MAX_CENTS = 100_000_000_000;
 
 export const parseCents = (input) => parseScaled(input, CENTS);
 export const parseQuantity = (input) => parseScaled(input, MILLI);

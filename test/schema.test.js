@@ -7,7 +7,7 @@ import {
   snapshotClient, invoiceTotals, validateInvoice, addressLines, isOverdue, daysOverdue,
   formatLongDate, validateClient, termById,
 } from '../src/schema.js';
-import { parseCents, parseQuantity } from '../src/money.js';
+import { parseCents, parseQuantity, lineAmountCents, MAX_CENTS } from '../src/money.js';
 
 test('due dates are calendar arithmetic, not timezone arithmetic', () => {
   assert.equal(dueDateFor('2026-09-02', 'net30'), '2026-10-02');
@@ -56,6 +56,45 @@ test('validation catches the ways an invoice goes out wrong', () => {
     lineItems: [{ description: 'Work', quantityMilli: parseQuantity('1'), rateCents: parseCents('') }],
   });
   assert.ok(validateInvoice(missingRate).some((e) => e.includes('rate')));
+});
+
+test('a line amount out of range is rejected even when both inputs parse', () => {
+  // The point of this test. Quantity and rate are each individually fine --
+  // parseScaled accepts both -- but their product leaves safe-integer range, so
+  // checking the inputs would pass it through. The product is what has to be
+  // bounded.
+  const quantityMilli = parseQuantity('900000000');
+  const rateCents = parseCents('9000000');
+  assert.ok(Number.isSafeInteger(quantityMilli), 'quantity alone is in range');
+  assert.ok(Number.isSafeInteger(rateCents), 'rate alone is in range');
+  assert.ok(!Number.isSafeInteger(lineAmountCents(quantityMilli, rateCents)),
+    'and yet the product is not');
+
+  const invoice = makeInvoice({
+    vendorId: 'acme-corporation',
+    clientId: 'coyote',
+    lineItems: [{ description: 'Anvils', quantityMilli, rateCents }],
+  });
+  assert.ok(validateInvoice(invoice).some((e) => e.includes('Line 1')));
+});
+
+test('lines under the ceiling can still add up to a total over it', () => {
+  // Each line is legal on its own, so a per-line check alone lets this through.
+  const half = { description: 'Rocket skates', quantityMilli: parseQuantity('1'), rateCents: MAX_CENTS };
+  const invoice = makeInvoice({
+    vendorId: 'acme-corporation', clientId: 'coyote', lineItems: [{ ...half }, { ...half }],
+  });
+  const errors = validateInvoice(invoice);
+  assert.equal(errors.filter((e) => e.includes('Line')).length, 0, 'no line is individually over');
+  assert.ok(errors.some((e) => e.includes('total')), 'but the total is');
+});
+
+test('an ordinary invoice is unaffected by either bound', () => {
+  const invoice = makeInvoice({
+    vendorId: 'acme-corporation', clientId: 'coyote',
+    lineItems: [{ description: 'Trajectory calibration', quantityMilli: parseQuantity('3.5'), rateCents: parseCents('150') }],
+  });
+  assert.deepEqual(validateInvoice(invoice), []);
 });
 
 test('address lines omit empties instead of printing blank rows', () => {

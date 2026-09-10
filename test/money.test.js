@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import './tmpdir.js';
 import {
   parseCents, parseQuantity, lineAmountCents, formatUSD, formatQuantity, sumCents,
-  quantityInputValue, centsInputValue,
+  quantityInputValue, centsInputValue, MAX_CENTS,
 } from '../src/money.js';
 
 test('parseCents accepts the shapes a human types', () => {
@@ -129,4 +129,33 @@ test('negative amounts round away from zero, like positive ones', () => {
   assert.equal(formatUSD(-187500), '-$1,875.00');
   assert.equal(centsInputValue(-15000), '-150.00');
   assert.equal(sumCents([15000, -5000, null]), 10000);
+});
+
+test('a value past safe-integer range is rejected, not stored approximately', () => {
+  // Holding a digit key down in the rate field reaches this with no malice.
+  // Before the guard this returned 1e+23 and JSON.stringify wrote it back as
+  // "1e+23", so the stored value no longer round-tripped to itself.
+  assert.equal(parseCents('999999999999999999999'), null);
+  assert.equal(parseQuantity('999999999999999999999'), null);
+
+  // The boundary itself, to the cent. Rejecting one cent too early would be a
+  // silent cap, which is the failure this guard exists to prevent.
+  assert.equal(parseCents('90071992547409.91'), Number.MAX_SAFE_INTEGER);
+  assert.equal(parseCents('90071992547409.92'), null);
+});
+
+test('every value parseCents returns survives a JSON round trip exactly', () => {
+  for (const input of ['0', '0.01', '1234.56', '-5.00', '90071992547409.91']) {
+    const cents = parseCents(input);
+    assert.equal(JSON.parse(JSON.stringify({ cents })).cents, cents);
+    assert.ok(Number.isSafeInteger(cents), `${input} parsed to a non-integer`);
+  }
+});
+
+test('MAX_CENTS is far below the safe-integer ceiling, deliberately', () => {
+  // The two bounds do different jobs: safe-integer is correctness, MAX_CENTS is
+  // plausibility. If these ever converge, the plausibility check has stopped
+  // being a check on anything a human would notice.
+  assert.ok(MAX_CENTS < Number.MAX_SAFE_INTEGER / 1000);
+  assert.equal(formatUSD(MAX_CENTS), '$1,000,000,000.00');
 });

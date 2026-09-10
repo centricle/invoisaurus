@@ -6,7 +6,7 @@
  * ids, no nested collections except an invoice's own line items, no derived
  * values that a query could not recompute.
  */
-import { lineAmountCents, sumCents } from './money.js';
+import { lineAmountCents, sumCents, formatUSD, MAX_CENTS } from './money.js';
 
 export const SCHEMA_VERSION = 1;
 
@@ -151,6 +151,16 @@ export function makeInvoice(input = {}) {
   };
 }
 
+/**
+ * Is this a real, exact, plausible money value?
+ *
+ * `Number.isSafeInteger` is the load-bearing half. An amount past 2^53 is not
+ * an exact integer any more, so comparing it against a ceiling is already
+ * comparing an approximation -- test that it is a safe integer first, then that
+ * it is sane.
+ */
+const withinBounds = (cents) => Number.isSafeInteger(cents) && Math.abs(cents) <= MAX_CENTS;
+
 /** Totals are derived, never stored. A stored total is a total that can lie. */
 export function invoiceTotals(invoice) {
   const amounts = invoice.lineItems.map((li) => lineAmountCents(li.quantityMilli, li.rateCents));
@@ -176,7 +186,15 @@ export function validateInvoice(invoice, refs = {}) {
     if (!li.description.trim()) errors.push(`Line ${i + 1} needs a description.`);
     if (li.quantityMilli == null) errors.push(`Line ${i + 1} needs a quantity.`);
     if (li.rateCents == null) errors.push(`Line ${i + 1} needs a rate.`);
+    if (!withinBounds(lineAmountCents(li.quantityMilli, li.rateCents))) {
+      errors.push(`Line ${i + 1} comes to more than ${formatUSD(MAX_CENTS)}. Check the quantity and rate.`);
+    }
   });
+  // Checked separately: every line can be under the ceiling while the total is
+  // over it, and the total is the figure someone is asked to pay.
+  if (!withinBounds(invoiceTotals(invoice).totalCents)) {
+    errors.push(`The invoice total is more than ${formatUSD(MAX_CENTS)}.`);
+  }
   return errors;
 }
 
