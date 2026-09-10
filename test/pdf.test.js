@@ -311,3 +311,48 @@ test('an invoice with no line items still renders a document', async () => {
   assert.ok(text.includes('$0.00'), 'a total of nothing is still a total');
   assert.ok(!text.includes('DESCRIPTION'), 'no column headings over an empty table');
 });
+
+test('the demo watermark is drawn, and only when asked for', async () => {
+  const invoice = invoiceWith([line('Consulting')]);
+
+  const plain = pdfStrings(await generateInvoicePdf(invoice)).join('\n');
+  const marked = pdfStrings(await generateInvoicePdf(invoice, { watermark: true })).join('\n');
+
+  assert.ok(!plain.includes('DEMO'), 'a real invoice must never carry it');
+  assert.ok(marked.includes('DEMO'));
+});
+
+test('the watermark does not move a single row', async () => {
+  // The measure pass and the draw pass disagreeing about how much space
+  // something occupies is the bug that put rows below the bottom margin once
+  // already (see the header note at the top of generate.js). The watermark is
+  // drawn in the second pass only, so pagination must be untouched -- checked
+  // across a page boundary, where a one-row drift would show up.
+  for (const count of [1, 14, 15, 16, 35]) {
+    const invoice = invoiceWith(Array.from({ length: count }, (_, i) => line(`Item ${i + 1}`)));
+
+    const plain = await PDFDocument.load(await generateInvoicePdf(invoice));
+    const marked = await PDFDocument.load(await generateInvoicePdf(invoice, { watermark: true }));
+    assert.equal(marked.getPageCount(), plain.getPageCount(), `${count} lines paginated differently`);
+
+    const strip = (s) => s.filter((t) => t !== 'DEMO');
+    assert.deepEqual(
+      strip(pdfStrings(await generateInvoicePdf(invoice, { watermark: true }))),
+      pdfStrings(await generateInvoicePdf(invoice)),
+      `${count} lines: the watermark changed what else was drawn`,
+    );
+  }
+});
+
+test('every page of a multi-page demo invoice is watermarked', async () => {
+  // One mark on page one would leave later pages looking like a real invoice,
+  // which is the page someone would screenshot to claim it was.
+  const invoice = invoiceWith(Array.from({ length: 40 }, (_, i) => line(`Item ${i + 1}`)));
+  const bytes = await generateInvoicePdf(invoice, { watermark: true });
+
+  const pageCount = (await PDFDocument.load(bytes)).getPageCount();
+  assert.ok(pageCount > 1, 'the fixture should span pages');
+
+  const marks = pdfStrings(bytes).filter((t) => t === 'DEMO').length;
+  assert.equal(marks, pageCount);
+});
