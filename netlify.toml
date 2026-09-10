@@ -1,24 +1,27 @@
 # The hosted demo. Not how the local tool runs -- see README.
 #
-# The app is one Express process wrapped in a function (netlify/functions/app.mjs);
-# public/ is staged into dist/ by scripts/build-static.mjs so the CDN serves the
-# static assets and only real pages reach the function.
+# The app is one Express process wrapped in a Netlify function
+# (netlify/functions/app.js); public/ is staged into dist/ by
+# scripts/build-static.mjs so the CDN serves the static assets and only real
+# pages reach the function.
 #
-# Reached at https://centricle.com/etc/invoisaurus, proxied from the centricle
-# site with the path preserved. BASE_PATH below has to match the prefix in that
-# proxy rule, or every link on every page points somewhere that does not exist.
+# Nothing here is specific to a particular site. Fork it, point a Netlify
+# project at it, and you get a working demo at the root of your own domain.
+#
+# To serve it under a path prefix instead -- the way this project's own demo is
+# proxied under a path on another site -- set BASE_PATH as a project
+# environment variable:
+#
+#   netlify env:set BASE_PATH "/some/prefix"
+#
+# Not in [build.environment] below, deliberately: variables set there are
+# build-time only, and this one has to reach the function at runtime too.
+# Project environment variables reach both.
 
 [build]
   command = "npm run css:build && node scripts/build-static.mjs"
   publish = "dist"
   functions = "netlify/functions"
-
-# Build-time only. Functions cannot read these at runtime, which is why
-# netlify/functions/app.mjs sets its own copies -- see the note there before
-# changing either. BASE_PATH is here because the build stages files into a
-# directory named after it.
-[build.environment]
-  BASE_PATH = "/etc/invoisaurus"
 
 [functions]
   node_bundler = "nft"
@@ -28,26 +31,22 @@
   # first page it is asked for.
   #
   # The exclusion is the important half. src/config.js contains
-  # `path.join(ROOT, 'data')` as the default data directory, and nft resolves
-  # that expression statically and packages the whole directory -- which on a
-  # working machine is the operator's real invoice records, client addresses
-  # and all, plus the private git repo inside it. .gitignore does not apply
+  # `path.join(ROOT, 'data')` as the default data directory, and the tracer
+  # resolves that expression statically and packages the whole directory --
+  # which on a working machine is the operator's real invoice records, client
+  # addresses and all, plus any git repo inside it. .gitignore does not apply
   # here: it governs git, not Netlify's bundler, so nothing about the repo
   # being clean says anything about what ships in the artifact.
   #
   # Verify rather than trust: `npm run check:bundle`.
   included_files = ["src/views/**", "!data/**", "!tmp/**", "!docs/**"]
 
-# The app answers only under BASE_PATH, so the bare origin is otherwise a 404.
-# Anyone who reaches this host directly typed it or followed an old link; send
-# them to the front door rather than to nothing.
-[[redirects]]
-  from = "/"
-  to = "/etc/invoisaurus/"
-  status = 302
-
 # Everything the CDN did not already answer from dist/. Not forced, so a real
 # file always wins -- that is what keeps CSS and JS off the function.
+#
+# The bare origin needs no rule here. With no BASE_PATH the app already serves
+# at the root; with one, server.js redirects the root to the prefix, so the
+# behavior travels with the app instead of living in this file.
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/app"

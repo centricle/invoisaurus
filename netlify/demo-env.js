@@ -5,7 +5,8 @@
  * top-level file in the functions directory as a function of its own, and this
  * one was being deployed as an endpoint that does nothing.
  *
- * src/config.js resolves DEMO_MODE, BASE_PATH and NODE_ENV once at import
+ * src/config.js resolves DEMO_MODE, BASE_PATH, NODE_ENV and the project root
+ * once at import
  * time, and ES imports all evaluate before any statement in the importing
  * module runs -- so assigning them in app.mjs's body would happen after
  * config.js had already read them. Importing this module first is what makes
@@ -30,7 +31,12 @@
 process.env.INVOISAURUS_ROOT ??= process.env.LAMBDA_TASK_ROOT || process.cwd();
 
 process.env.DEMO_MODE = 'true';
-process.env.BASE_PATH ??= '/etc/invoisaurus';
+
+// BASE_PATH is deliberately not defaulted here. It describes where a
+// particular deployment is mounted, not anything about this app, and baking
+// one site's path into the repo would serve every fork under a prefix that
+// means nothing on its host. Unset means the root, which is what a fork wants.
+// This project's own deploy sets it as a project environment variable.
 
 // Turns on template caching in src/viewEngine.js. Deliberately not set in
 // netlify.toml: NODE_ENV=production at build time makes npm skip
