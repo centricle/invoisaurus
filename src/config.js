@@ -1,7 +1,21 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+/**
+ * Where the app's own files live: templates, and public/ when it is served
+ * from here.
+ *
+ * `import.meta.url` is the natural answer and the right one for every way this
+ * app is normally run. It does not survive being bundled, though: a serverless
+ * bundler transpiles the module to CommonJS and replaces `import.meta` with an
+ * empty object, so `fileURLToPath(undefined)` throws while the module is still
+ * being imported -- before any request, with a stack that points here rather
+ * than at the bundler. Hence the override, checked first so the failing call
+ * is never reached when it is set.
+ */
+const ROOT = process.env.INVOISAURUS_ROOT
+  ? path.resolve(process.env.INVOISAURUS_ROOT)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
  * The data directory is deliberately outside this repository's tracked tree.

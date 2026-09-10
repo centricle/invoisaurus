@@ -4,6 +4,9 @@ data/
 # Tailwind build output
 public/css/dist/
 
+# Netlify publish directory, staged by scripts/build-static.mjs
+dist/
+
 node_modules/
 .DS_Store
 

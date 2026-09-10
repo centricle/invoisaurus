@@ -8,6 +8,8 @@
     "setup": "sh scripts/bootstrap.sh",
     "dev": "concurrently -n css,web -c magenta,green \"npm:css\" \"node --watch server.js\"",
     "start": "npm run css:build && node server.js",
+    "build": "npm run css:build && node scripts/build-static.mjs",
+    "check:bundle": "node scripts/check-bundle.mjs",
     "css": "npx @tailwindcss/cli -i public/css/app.css -o public/css/dist/app.css --watch",
     "css:build": "npx @tailwindcss/cli -i public/css/app.css -o public/css/dist/app.css --minify",
     "seed": "node scripts/seed.mjs",
@@ -17,7 +19,8 @@
   "dependencies": {
     "ejs": "^3.1.10",
     "express": "^5.1.0",
-    "pdf-lib": "^1.17.1"
+    "pdf-lib": "^1.17.1",
+    "serverless-http": "^4.0.0"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.18",
