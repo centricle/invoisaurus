@@ -38,6 +38,14 @@
   # Verify rather than trust: `npm run check:bundle`.
   included_files = ["src/views/**", "!data/**", "!tmp/**", "!docs/**"]
 
+# The app answers only under BASE_PATH, so the bare origin is otherwise a 404.
+# Anyone who reaches this host directly typed it or followed an old link; send
+# them to the front door rather than to nothing.
+[[redirects]]
+  from = "/"
+  to = "/etc/invoisaurus/"
+  status = 302
+
 # Everything the CDN did not already answer from dist/. Not forced, so a real
 # file always wins -- that is what keeps CSS and JS off the function.
 [[redirects]]
