@@ -7,6 +7,7 @@
   "scripts": {
     "setup": "sh scripts/bootstrap.sh",
     "dev": "concurrently -n css,web -c magenta,green \"npm:css\" \"node --watch server.js\"",
+    "demo": "npm run css:build && node scripts/demo.mjs",
     "start": "npm run css:build && node server.js",
     "build": "npm run css:build && node scripts/build-static.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",

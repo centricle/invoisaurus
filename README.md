@@ -48,7 +48,11 @@ The CSS build is not optional. The compiled stylesheet is generated rather than
 committed, so a fresh clone that skips it runs fine but renders every page
 unstyled.
 
-## Demo data
+## Seed data
+
+Named for `npm run seed`, which puts sample records in your own data directory.
+Not to be confused with [Demo mode](#demo-mode) below, which is the hosted,
+writes-nothing mode.
 
 The seed creates three fictional records:
 
@@ -79,6 +83,70 @@ invoice is still `ACM-0004`. A gap in the series is a voided invoice; a
 duplicate is an accounting problem. Removing the demo vendor entirely does reset
 the counter, because the counter lives on the vendor record.
 
+## Demo mode
+
+There is a second way to run this, used for the
+[public demo](https://centricle.com/etc/invoisaurus/): every browser
+session gets its own set of records, held in memory and seeded with the ACME
+cast, and **nothing is written to disk at all.**
+
+```sh
+npm run demo
+```
+
+Then open <http://localhost:7055/invoices>. It runs on its own port so it can
+sit alongside `npm run dev` rather than replacing it, and it points
+`INVOISAURUS_DATA_DIR` at a path that does not exist, so it cannot reach your
+real invoices even by accident.
+
+What is different from the normal app:
+
+- Records live in memory, per session. Two browsers see two different sets, and
+  closing the tab is a reset. A **Reset demo** button in the banner does the
+  same thing on purpose.
+- The seed is larger: five invoices across three clients, covering every status
+  including one that is overdue, so the list screen has something to show.
+- Generated PDFs carry a diagonal `DEMO` watermark. They are otherwise the real
+  thing, produced from whatever you typed by the same code the local tool uses.
+- A banner and a `DEMO` badge appear on every page.
+
+Everything else is the same code. Demo mode swaps the storage layer underneath
+`src/store.js` rather than branching inside the routes, so validation, invoice
+numbering, the snapshot freeze and the PDF are all the ones described above.
+
+### Serving it under a path prefix
+
+The hosted demo lives at a subpath of another site, so the app can be mounted
+under a prefix:
+
+```sh
+npm run demo -- --base=/etc/invoisaurus
+```
+
+Every link, form action, asset URL, redirect and cookie path shifts to match.
+The bare root then returns 404, which is correct. The app is at
+`/etc/invoisaurus/invoices`. `BASE_PATH` is empty by default and the local tool
+never needs it.
+
+### The hosted build
+
+`netlify.toml` describes the deployment: the Express app runs as a single
+Netlify function, and `public/` is staged into `dist/` so the CDN serves the
+static assets. To reproduce the build the way CI runs it:
+
+```sh
+npx netlify build
+npm run check:bundle
+```
+
+`check:bundle` inspects the generated function archive and fails if it contains
+anything private. That is not paranoia: the bundler traces file paths out of the
+source and once packaged the entire `data/` directory, real invoices included,
+because a default path in `src/config.js` pointed at it. `.gitignore` governs
+git, not the bundler, so a clean repo says nothing about what ships. CI builds
+from a fresh clone where `data/` does not exist; a local deploy is where this
+matters.
+
 ## Design
 
 **Your data is not in this repo.** The application reads and writes an external
@@ -108,8 +176,15 @@ Each vendor carries its own prefix, padding and counter.
 | `INVOISAURUS_DATA_DIR` | `./data` | Where records are read and written |
 | `PORT` | `7054` | Port the server listens on |
 | `NODE_ENV` | unset | `production` enables template caching |
+| `DEMO_MODE` | unset | `true` runs [demo mode](#demo-mode): in-memory records, nothing written |
+| `BASE_PATH` | empty | Serve the app under a path prefix, e.g. `/etc/invoisaurus` |
+| `INVOISAURUS_ROOT` | derived | Where the app's own files are. Only needed when bundling, which strips `import.meta` |
 
-All three are read at startup. To run against a different data directory on a
+`DEMO_MODE` is compared against the exact string `true`, so a stray
+`DEMO_MODE=false` cannot put a real installation into a mode where its saves
+silently go nowhere.
+
+All of them are read at startup. To run against a different data directory on a
 different port:
 
 ```sh
@@ -167,16 +242,23 @@ every pull request, against the Node version pinned in `.nvmrc`.
 | `server.js` | Express entry, mounts routes |
 | `src/config.js` | Resolves the data directory, port and project root |
 | `src/schema.js` | Record shapes and validation. The single definition of the data model. |
-| `src/store.js` | JSON read/write, atomic writes, invoice number allocation |
+| `src/store.js` | Record rules: atomic writes, invoice number allocation, the create/update split |
+| `src/storage.js` | Where those records physically live. Filesystem by default |
+| `src/storage-memory.js` | The in-memory backend demo mode swaps in |
+| `src/demo.js` | Per-session demo stores, seeding, and the reset |
+| `src/fixtures/acme.js` | The ACME cast, shared by the seeder and the demo |
 | `src/money.js` | Integer-cent arithmetic and formatting |
 | `src/lib/pdf/` | `layout.js` decides where things go, `generate.js` draws them |
 | `src/routes/` | One router each for invoices, clients, vendors |
 | `src/views/` | EJS templates |
 | `public/js/` | Browser-side behavior: the invoice editor, and the number steppers on the vendor and invoice forms |
+| `netlify/` | The hosted demo: one function wrapping the same Express app |
+| `netlify.toml` | How that deploy is built and routed |
 
 Express 5, EJS, Tailwind 4 via the CLI, pdf-lib. Line-item arithmetic is vanilla
 JS in the browser; everything else is a form POST. No bundler, no client
-framework, three runtime dependencies.
+framework, four runtime dependencies. The fourth, `serverless-http`, is used
+only by the hosted demo.
 
 ## License
 
