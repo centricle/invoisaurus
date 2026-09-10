@@ -1,18 +1,21 @@
 /**
- * JSON-file persistence.
+ * JSON-record persistence: the rules, not the bytes.
  *
  * Layout under DATA_DIR:
  *   vendors.json          array of vendor records
  *   clients.json          array of client records
  *   invoices/ACM-0001.json  one file per invoice
  *
- * Writes go through a temp file and a rename, which is atomic on a single
- * filesystem. A crash mid-write therefore leaves the previous version intact
- * rather than a truncated invoice.
+ * Reads and writes go through `storage.js`, which owns the atomic temp-file
+ * rename and, in the hosted demo, swaps the filesystem out for a per-visitor
+ * store. Nothing in this file knows or cares which is in use: the paths are
+ * the same strings either way, so every guarantee below holds in both.
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR } from './config.js';
+import {
+  readJson, writeJson, exists, listDir, remove, ensureDir,
+} from './storage.js';
 import {
   formatInvoiceNumber, makeVendor, makeClient, makeInvoice, uniqueId, INVOICE_ID,
 } from './schema.js';
@@ -22,34 +25,10 @@ const CLIENTS = path.join(DATA_DIR, 'clients.json');
 const INVOICE_DIR = path.join(DATA_DIR, 'invoices');
 
 export function ensureDataDir() {
-  fs.mkdirSync(INVOICE_DIR, { recursive: true });
+  ensureDir(INVOICE_DIR);
   for (const file of [VENDORS, CLIENTS]) {
-    if (!fs.existsSync(file)) writeJson(file, []);
+    if (!exists(file)) writeJson(file, []);
   }
-}
-
-function readJson(file, fallback) {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch (err) {
-    if (err.code === 'ENOENT') return fallback;
-    // A malformed file is a data-loss event, not a missing-value event. Fail
-    // loudly rather than silently returning [] and letting a save overwrite it.
-    throw new Error(`Corrupt data file ${file}: ${err.message}`);
-  }
-}
-
-function writeJson(file, value) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.tmp`;
-  const fd = fs.openSync(tmp, 'w');
-  try {
-    fs.writeFileSync(fd, `${JSON.stringify(value, null, 2)}\n`);
-    fs.fsyncSync(fd);
-  } finally {
-    fs.closeSync(fd);
-  }
-  fs.renameSync(tmp, file);
 }
 
 // --- Vendors ---------------------------------------------------------------
@@ -209,18 +188,18 @@ const isInvoiceShaped = (value) => Boolean(value)
  * where someone will actually see it.
  */
 export function scanInvoices() {
-  if (!fs.existsSync(INVOICE_DIR)) return { invoices: [], unreadable: [] };
+  if (!exists(INVOICE_DIR)) return { invoices: [], unreadable: [] };
 
   const invoices = [];
   const unreadable = [];
-  for (const file of fs.readdirSync(INVOICE_DIR).filter((f) => f.endsWith('.json'))) {
+  for (const file of listDir(INVOICE_DIR).filter((f) => f.endsWith('.json'))) {
     try {
       const invoice = readJson(path.join(INVOICE_DIR, file), null);
       if (isInvoiceShaped(invoice)) invoices.push(invoice);
       // A file that vanished between the readdir and the read reads as null and
       // is simply gone; anything else that parsed is a file in the invoice
       // directory that is not an invoice, and someone has to be told about it.
-      else if (invoice !== null || fs.existsSync(path.join(INVOICE_DIR, file))) {
+      else if (invoice !== null || exists(path.join(INVOICE_DIR, file))) {
         unreadable.push({ file, message: 'Not an invoice record.' });
       }
     } catch (err) {
@@ -263,7 +242,7 @@ export function saveInvoice(input, { create = false } = {}) {
   const invoice = makeInvoice(input);
   if (!invoice.id) throw new Error('Invoice has no id; allocate a number first.');
   const file = invoicePath(invoice.id);
-  if (create && fs.existsSync(file)) {
+  if (create && exists(file)) {
     throw new Error(`Invoice ${invoice.id} already exists; refusing to overwrite it.`);
   }
   writeJson(file, invoice);
@@ -271,5 +250,5 @@ export function saveInvoice(input, { create = false } = {}) {
 }
 
 export function deleteInvoice(id) {
-  fs.rmSync(invoicePath(id), { force: true });
+  remove(invoicePath(id));
 }
