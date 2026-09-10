@@ -84,6 +84,14 @@ app.use((req, res, next) => {
 
 app.get(u('/'), (req, res) => res.redirect('/invoices'));
 
+// Mounted under a prefix, the bare origin belongs to nobody: this app never
+// registered it, so it would 404. Anyone landing there typed the host or
+// followed an old link, so send them to the front door. Registered only when
+// there is a prefix, because without one this route is the line above.
+// `'/'`, not `u('/')`: res.redirect is wrapped above to prefix app-relative
+// paths, so prefixing here too produces /etc/invoisaurus/etc/invoisaurus/.
+if (BASE_PATH) app.get('/', (req, res) => res.redirect('/'));
+
 // Demo only: throw this visitor's records away and start over. A POST because
 // it destroys data, so a crawler or a prefetch cannot trigger it.
 app.post(u('/demo/reset'), (req, res) => {

@@ -40,9 +40,15 @@ test('every route answers under the prefix and nowhere else', async () => {
       assert.equal((await get(base, PREFIX + p)).status, 200, `${PREFIX}${p} should serve`);
       assert.equal((await get(base, p)).status, 404, `${p} should not`);
     }
-    const root = await get(base, `${PREFIX}/`);
+      const root = await get(base, `${PREFIX}/`);
     assert.equal(root.status, 302);
     assert.equal(root.headers.get('location'), `${PREFIX}/invoices`);
+
+    // The bare origin is not this app's, but 404ing someone who typed the
+    // host is unhelpful when there is an obvious place to send them.
+    const bare = await get(base, '/');
+    assert.equal(bare.status, 302);
+    assert.equal(bare.headers.get('location'), `${PREFIX}/`);
   });
 });
 
