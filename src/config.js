@@ -14,3 +14,14 @@ export const DATA_DIR = path.resolve(process.env.INVOISAURUS_DATA_DIR || path.jo
 
 export const PORT = Number(process.env.PORT || 7054);
 export const ROOT_DIR = ROOT;
+
+/**
+ * Demo mode: every visitor gets a private, in-memory set of records and
+ * nothing is ever written to disk.
+ *
+ * Compared against the exact string rather than tested for truthiness, so a
+ * stray `DEMO_MODE=false` or `DEMO_MODE=0` in an environment cannot switch a
+ * real installation into a mode where its saves quietly go nowhere. Off is the
+ * default and the only safe default.
+ */
+export const DEMO_MODE = process.env.DEMO_MODE === 'true';
