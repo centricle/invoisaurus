@@ -8,6 +8,32 @@
   <link rel="stylesheet" href="<%= u('/css/dist/app.css') %>">
 </head>
 <body class="h-full bg-slate-950 text-slate-200 antialiased">
+  <% if (locals.demoMode) { %>
+    <%
+      // Two different messages. A first visit is being told the rules; a
+      // reset is being told where their work went, which is the one that
+      // would otherwise read as the app losing data.
+    %>
+    <div class="border-b border-amber-900/60 bg-amber-950/40 text-amber-300">
+      <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-2.5 text-sm">
+        <p>
+          <% if (locals.demoReset) { %>
+            <strong class="font-medium">Your demo session expired.</strong>
+            The sample data is back; anything you added is gone.
+          <% } else { %>
+            <strong class="font-medium">This is a demo.</strong>
+            Create and edit anything you like. Nothing is saved, and it all disappears when your session ends.
+          <% } %>
+        </p>
+        <form method="post" action="<%= u('/demo/reset') %>">
+          <button type="submit"
+                  class="rounded border border-amber-800/70 px-2 py-1 text-xs text-amber-200 hover:bg-amber-900/40">
+            Reset demo
+          </button>
+        </form>
+      </div>
+    </div>
+  <% } %>
   <header class="border-b border-slate-800">
     <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
       <a href="<%= u('/') %>" class="flex items-center gap-2 text-sm font-semibold tracking-tight text-slate-100">
@@ -19,6 +45,9 @@
           <rect x="4" y="18" width="16" height="4" rx="1" /><rect x="4" y="6" width="16" height="4" rx="1" />
         </svg>
         Invoisaurus
+        <% if (locals.demoMode) { %>
+          <span class="rounded bg-amber-900/60 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-amber-300">Demo</span>
+        <% } %>
       </a>
       <nav class="flex gap-5 text-sm">
         <%

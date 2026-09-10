@@ -1,7 +1,15 @@
   </main>
   <script src="<%= u('/js/stepper.js') %>" defer></script>
   <footer class="mx-auto max-w-5xl px-6 pb-10 text-xs text-slate-600">
-    <span class="font-mono"><%= dataDir %></span>
+    <% if (locals.demoMode) { %>
+      <%# Where the data dir goes locally. In the demo there is no directory to %>
+      <%# name, so the slot carries the thing a visitor would actually want. %>
+      Records live in memory for this session only.
+      <a href="https://github.com/centricle/invoisaurus" class="text-slate-500 underline hover:text-slate-300">Run it locally</a>
+      to keep them.
+    <% } else { %>
+      <span class="font-mono"><%= dataDir %></span>
+    <% } %>
   </footer>
 </body>
 </html>
