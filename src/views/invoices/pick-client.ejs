@@ -10,15 +10,15 @@
   <div class="rounded-lg border border-dashed border-slate-800 px-6 py-16 text-center">
     <p class="text-sm text-slate-400">No vendors yet.</p>
     <p class="mt-1 text-xs text-slate-500">A vendor is the entity that issues the invoice and owns its number series.</p>
-    <a href="/vendors/new" class="mt-3 inline-block text-sm text-sky-400 hover:underline">Add a vendor</a>
+    <a href="<%= u('/vendors/new') %>" class="mt-3 inline-block text-sm text-sky-400 hover:underline">Add a vendor</a>
   </div>
 <% } else if (!clients.length) { %>
   <div class="rounded-lg border border-dashed border-slate-800 px-6 py-16 text-center">
     <p class="text-sm text-slate-400">No clients yet.</p>
-    <a href="/clients/new" class="mt-3 inline-block text-sm text-sky-400 hover:underline">Add a client</a>
+    <a href="<%= u('/clients/new') %>" class="mt-3 inline-block text-sm text-sky-400 hover:underline">Add a client</a>
   </div>
 <% } else { %>
-  <form method="get" action="/invoices/new" class="max-w-lg space-y-5">
+  <form method="get" action="<%= u('/invoices/new') %>" class="max-w-lg space-y-5">
     <label class="block">
       <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Client</span>
       <select name="clientId" required class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
@@ -37,7 +37,7 @@
 
     <div class="flex items-center gap-3">
       <button type="submit" class="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500">Continue</button>
-      <a href="/invoices" class="text-sm text-slate-400 hover:text-slate-200">Cancel</a>
+      <a href="<%= u('/invoices') %>" class="text-sm text-slate-400 hover:text-slate-200">Cancel</a>
     </div>
   </form>
 <% } %>

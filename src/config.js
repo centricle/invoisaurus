@@ -25,3 +25,23 @@ export const ROOT_DIR = ROOT;
  * default and the only safe default.
  */
 export const DEMO_MODE = process.env.DEMO_MODE === 'true';
+
+/**
+ * A path prefix the whole app is served under, e.g. `/etc/invoisaurus`.
+ *
+ * The hosted demo lives at a subpath of another site, reached by a Netlify
+ * proxy that preserves the path -- so this process really does receive
+ * `/etc/invoisaurus/invoices`, and mounting there is simpler and less
+ * surprising than stripping the prefix on the way in and re-adding it to every
+ * link on the way out.
+ *
+ * Empty by default, which must remain byte-for-byte the behavior the local
+ * tool has always had. Normalized rather than trusted: a trailing slash would
+ * produce `//invoices`, which is a protocol-relative URL to the host
+ * `invoices` -- an off-site link, from a typo in an env var.
+ */
+const rawBasePath = process.env.BASE_PATH || '';
+export const BASE_PATH = rawBasePath.replace(/\/+$/, '');
+
+/** Prefix an app-absolute path. The one place a URL is built. */
+export const u = (p = '/') => `${BASE_PATH}${p}`;

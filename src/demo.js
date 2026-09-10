@@ -21,7 +21,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import crypto from 'node:crypto';
-import { DEMO_MODE } from './config.js';
+import { DEMO_MODE, BASE_PATH } from './config.js';
 import { fsBackend, useBackendResolver } from './storage.js';
 import { createMemoryBackend } from './storage-memory.js';
 import {
@@ -32,6 +32,9 @@ import { parseQuantity, parseCents } from './money.js';
 import { VENDOR, CLIENT, DEMO_CLIENTS, DEMO_INVOICES } from './fixtures/acme.js';
 
 export const COOKIE = 'demo_sid';
+
+/** Same reasoning as the flash cookie: scoped to the mount, not the host. */
+const COOKIE_PATH = BASE_PATH || '/';
 
 /** How long an idle visitor keeps their records. */
 const TTL_MS = 2 * 60 * 60 * 1000;
@@ -150,7 +153,7 @@ export function demoSession(req, res, next) {
   touch(id, session);
 
   res.cookie(COOKIE, id, {
-    path: '/', httpOnly: true, sameSite: 'lax', maxAge: TTL_MS,
+    path: COOKIE_PATH, httpOnly: true, sameSite: 'lax', maxAge: TTL_MS,
   });
   res.locals.demoMode = true;
   res.locals.demoReset = reset;
@@ -162,7 +165,7 @@ export function demoSession(req, res, next) {
 export function resetSession(req, res) {
   const sid = readCookie(req, COOKIE);
   if (sid) store.delete(sid);
-  res.clearCookie(COOKIE, { path: '/' });
+  res.clearCookie(COOKIE, { path: COOKIE_PATH });
 }
 
 function readCookie(req, name) {

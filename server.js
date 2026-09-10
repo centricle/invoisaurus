@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'node:path';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { PORT, ROOT_DIR, DATA_DIR, DEMO_MODE } from './src/config.js';
+import { PORT, ROOT_DIR, DATA_DIR, DEMO_MODE, BASE_PATH, u } from './src/config.js';
 import { ensureDataDir } from './src/store.js';
 import {
   formatUSD, formatQuantity, formatCents, quantityInputValue, centsInputValue,
@@ -39,7 +39,7 @@ app.set('views', path.join(ROOT_DIR, 'src/views'));
 // number; stating it makes it a decision rather than a default, now that the
 // form is reachable by anyone.
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
-app.use(express.static(path.join(ROOT_DIR, 'public')));
+app.use(BASE_PATH || '/', express.static(path.join(ROOT_DIR, 'public')));
 
 // After static, before anything that reads or writes records: binds this
 // request to the visitor's own store. A no-op outside demo mode. Sitting
@@ -52,6 +52,9 @@ Object.assign(app.locals, {
   formatUSD, formatQuantity, formatCents, quantityInputValue, centsInputValue,
   clientLabel, addressLines, termById, dueDateFor, formatInvoiceNumber,
   isOverdue, daysOverdue, field, statusBadgeClass, dataDir: displayDataDir,
+  // Every link and form action in a template goes through this. A bare
+  // href="/invoices" is correct locally and off-site under the demo's prefix.
+  u, demoMode: DEMO_MODE,
 });
 
 // A confirmation belongs to one moment, so it is read and cleared here rather
@@ -59,24 +62,39 @@ Object.assign(app.locals, {
 // See src/flash.js. `currentPath` rides along because nav highlighting is the
 // same kind of thing: per-request state a template needs and cannot derive.
 app.use((req, res, next) => {
-  res.locals.currentPath = req.path;
+  // The prefix is mounting detail, not part of the page's identity: the nav
+  // highlights on the first segment, which would otherwise read "etc".
+  res.locals.currentPath = BASE_PATH && req.path.startsWith(BASE_PATH)
+    ? req.path.slice(BASE_PATH.length) || '/'
+    : req.path;
   res.locals.flash = takeFlash(req, res);
+
+  // Redirects are prefixed here rather than at each of the eight call sites.
+  // A handler saying `res.redirect('/invoices')` means the invoice list, and
+  // it should not have to know where the app happens to be mounted -- one
+  // missed call site would send a visitor to the parent site's 404.
+  const redirect = res.redirect.bind(res);
+  res.redirect = (...args) => {
+    const url = args.pop();
+    return redirect(...args, typeof url === 'string' && url.startsWith('/') ? u(url) : url);
+  };
+
   next();
 });
 
-app.get('/', (req, res) => res.redirect('/invoices'));
+app.get(u('/'), (req, res) => res.redirect('/invoices'));
 
 // Demo only: throw this visitor's records away and start over. A POST because
 // it destroys data, so a crawler or a prefetch cannot trigger it.
-app.post('/demo/reset', (req, res) => {
+app.post(u('/demo/reset'), (req, res) => {
   if (!DEMO_MODE) return res.status(404).render('404', { what: 'Page' });
   resetSession(req, res);
   return res.redirect('/invoices');
 });
 
-app.use('/invoices', invoicesRouter);
-app.use('/clients', clientsRouter);
-app.use('/vendors', vendorsRouter);
+app.use(u('/invoices'), invoicesRouter);
+app.use(u('/clients'), clientsRouter);
+app.use(u('/vendors'), vendorsRouter);
 
 app.use((req, res) => res.status(404).render('404', { what: 'Page' }));
 
