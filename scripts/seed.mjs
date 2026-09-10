@@ -1,6 +1,11 @@
 /**
  * Demo data: one vendor, one client, one invoice.
  *
+ * Records come from `src/fixtures/acme.js`, shared with the hosted demo. This
+ * script deliberately seeds only the single draft: it writes into a real data
+ * directory that someone is about to put their own invoices in, so one
+ * obviously-fake client is a sample and three would be cleanup.
+ *
  * Run once after install to get a populated app to look at. Everything it
  * creates is fictional and safe to delete -- see `--remove` below, and the
  * "Demo data" section of the README.
@@ -23,34 +28,8 @@ import {
 import { makeInvoice, withSnapshots, validateInvoice, invoiceTotals, today } from '../src/schema.js';
 import { parseQuantity, parseCents, formatUSD } from '../src/money.js';
 import { DATA_DIR } from '../src/config.js';
-
-const VENDOR = {
-  name: 'ACME Corporation',
-  email: 'billing@acme-corp.example',
-  address: { street: '1 Anvil Plaza', city: 'Sedona', state: 'AZ', zip: '86336' },
-  numberPrefix: 'ACM-',
-  numberPad: 4,
-  nextNumber: 1,
-};
-
-const CLIENT = {
-  name: 'Wile E. Coyote',
-  displayName: '',
-  type: 'individual',
-  contactName: '',
-  address: { street: '22 Mesa Verde Rd', city: 'Tucumcari', state: 'NM', zip: '88401' },
-};
-
-const LINE_ITEMS = [
-  { description: 'Rocket skates (model XLR-8): fitting and trajectory calibration', quantity: '3.5', rate: '150.00' },
-  { description: 'Anvil, expedited cliffside delivery', quantity: '2', rate: '85.00' },
-];
-
-const NOTES = 'Payment due within 30 days. ACME accepts no liability for outcomes '
-  + 'involving cliffs, tunnels painted on rock faces, or product used contrary to the manual.';
-
-const VENDOR_ID = 'acme-corporation'; // slugify('ACME Corporation')
-const CLIENT_ID = 'wile-e-coyote';    // slugify('Wile E. Coyote')
+// The cast lives in one place so this and the hosted demo cannot drift.
+import { VENDOR, CLIENT, LINE_ITEMS, NOTES, VENDOR_ID, CLIENT_ID } from '../src/fixtures/acme.js';
 
 function seed() {
   ensureDataDir();
