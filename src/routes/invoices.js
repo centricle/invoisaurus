@@ -10,6 +10,7 @@ import {
 import { parseCents, parseQuantity } from '../money.js';
 import { generateInvoicePdf } from '../lib/pdf/generate.js';
 import { setFlash } from '../flash.js';
+import { DEMO_MODE } from '../config.js';
 
 export const invoicesRouter = express.Router();
 
@@ -162,12 +163,23 @@ invoicesRouter.get('/:id/pdf', async (req, res, next) => {
   const invoice = getInvoice(req.params.id);
   if (!invoice) return res.status(404).render('404', { what: 'Invoice' });
   try {
-    const bytes = await generateInvoicePdf(invoice);
+    // Really generated from this visitor's own records, watermarked rather
+    // than withheld. A canned PDF would contradict the form they just filled
+    // in, and the document is the half of this tool worth showing.
+    const bytes = await generateInvoicePdf(invoice, { watermark: DEMO_MODE });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
       `${req.query.download == null ? 'inline' : 'attachment'}; filename="${invoice.id}.pdf"`,
     );
+    // The editor previews this in an iframe. Hosted, the app is proxied under
+    // a site that sends `X-Frame-Options: DENY` for every path, which blocks
+    // framing even same-origin. Answering with a second X-Frame-Options would
+    // make it worse: browsers resolve conflicting values to the most
+    // restrictive. CSP frame-ancestors supersedes the older header in modern
+    // browsers, so it settles the question from here rather than depending on
+    // what the proxy passes through.
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
     res.end(Buffer.from(bytes));
   } catch (err) {
     next(err);

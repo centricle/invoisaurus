@@ -14,7 +14,7 @@
  * address line pushed rows below the bottom margin, and a short one left a
  * third of the page blank.
  */
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
 import {
   PAGE, CONTENT, SIZE, LEADING, COLUMNS, TOTALS_HEIGHT, META,
   wrapText, rowHeight, sanitize, firstBaselineY, linesThatFit,
@@ -194,7 +194,7 @@ export function planPages(invoice, { font, bold }) {
   };
 }
 
-export async function generateInvoicePdf(invoice) {
+export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -274,6 +274,39 @@ export async function generateInvoicePdf(invoice) {
       draw(page, at(`Page ${index + 1} of ${pageCount}`, {
         right: CONTENT.right, y: CONTENT.bottom - 18, size: SIZE.small, color: MUTED,
       }));
+    }
+
+    // Last, and only in the draw pass. `planPages` must never see this: the
+    // measure and draw passes disagreeing about how much space something takes
+    // is the exact bug the buildHeader split above exists to prevent, and a
+    // watermark that reserved layout space would push rows off the page.
+    // Drawn over the content rather than under it because pdf-lib has no
+    // z-order beyond call order, and a mark hidden behind an opaque box is not
+    // a watermark.
+    if (watermark) {
+      const text = 'DEMO';
+      const size = 110;
+      const width = bold.widthOfTextAtSize(text, size);
+      const cap = bold.heightAtSize(size, { descender: false });
+
+      // pdf-lib rotates about the text origin, which is the *start of the
+      // baseline*, not the middle of the glyphs. Centering the baseline's
+      // midpoint alone leaves the mark visibly low and to the left, because
+      // the glyph body sits off the baseline perpendicular to it. So: walk
+      // half the width back along the baseline, then half the cap height back
+      // along the perpendicular.
+      const along = Math.SQRT1_2;   // cos 45 = sin 45
+      page.drawText(text, {
+        x: PAGE.width / 2 - (width * along) / 2 + (cap * along) / 2,
+        y: PAGE.height / 2 - (width * along) / 2 - (cap * along) / 2,
+        size,
+        font: bold,
+        color: rgb(0.85, 0.35, 0.1),
+        rotate: degrees(45),
+        // Legible enough that nobody mistakes the document for a real invoice,
+        // faint enough to read the line items through it. Both matter.
+        opacity: 0.16,
+      });
     }
   });
 
