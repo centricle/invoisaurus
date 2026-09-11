@@ -65,6 +65,32 @@ test('a description too long for its column wraps', async () => {
   for (const l of lines) assert.ok(font.widthOfTextAtSize(l, 9.5) <= 262);
 });
 
+test('wrapText honors the line breaks already in a description', async () => {
+  // The editor could not produce one of these until descriptions became a
+  // textarea, but wrapText has always split on \n and nothing asserted it.
+  // A blank line between paragraphs survives as an empty line.
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const lines = wrapText('Environment restoration\n\nRepo and dependency audit', font, 9.5, 262);
+  assert.deepEqual(lines, ['Environment restoration', '', 'Repo and dependency audit']);
+});
+
+test('a line break makes the row taller, the same way a wrap does', async () => {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const one = planPages(invoiceWith([line('Environment restoration')]), { font, bold });
+  const two = planPages(invoiceWith([line('Environment restoration\nand verification')]), { font, bold });
+  assert.ok(two.pages[0][0].height > one.pages[0][0].height);
+});
+
+test('a multi-line description draws one line per break', async () => {
+  const invoice = invoiceWith([line('Environment restoration\nRepo and dependency audit')]);
+  const strings = pdfStrings(await generateInvoicePdf(invoice));
+  assert.ok(strings.includes('Environment restoration'));
+  assert.ok(strings.includes('Repo and dependency audit'));
+});
+
 test('an unbroken token wider than the column is split, not overflowed', async () => {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
