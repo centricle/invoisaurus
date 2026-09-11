@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 // Binds INVOISAURUS_DATA_DIR before config.js resolves it. See test/tmpdir.js.
 import './tmpdir.js';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { generateInvoicePdf, planPages } from '../src/lib/pdf/generate.js';
+import { generateInvoicePdf, planPages, embedFonts } from '../src/lib/pdf/generate.js';
 import { makeInvoice, snapshotClient, snapshotVendor, makeClient, makeVendor } from '../src/schema.js';
-import { wrapText, sanitize, CONTENT, META, SIZE } from '../src/lib/pdf/layout.js';
+import { sanitize, CONTENT, META, SIZE, TOTALS_HEIGHT } from '../src/lib/pdf/layout.js';
+import { layoutBlocks } from '../src/lib/pdf/richtext.js';
+import { parseMarkup } from '../src/lib/markup.js';
 import { parseCents, parseQuantity } from '../src/money.js';
 import { pdfStrings, pdfText } from './pdftext.js';
 
@@ -30,6 +32,20 @@ const line = (description, qty = '1', rate = '150') => ({
 
 const pageCount = async (invoice) =>
   (await PDFDocument.load(await generateInvoicePdf(invoice))).getPageCount();
+
+/** The four faces the drawer uses, for the tests that measure directly. */
+const fontsFor = async () => embedFonts(await PDFDocument.create());
+
+/** Lay text out against the description column, the way planPages does. */
+const layout = (text, fonts, maxWidth = COLUMNS_WIDTH) =>
+  layoutBlocks(parseMarkup(text), fonts, { maxWidth });
+
+const COLUMNS_WIDTH = 262;
+
+/** A laid-out line as the string it draws, and the width it occupies. */
+const lineText = (line) => line.segments.map((s) => s.text).join('');
+const lineWidth = (line) => line.indent
+  + line.segments.reduce((w, s) => w + s.font.widthOfTextAtSize(s.text, s.size), 0);
 
 test('a short invoice is one page', async () => {
   assert.equal(await pageCount(invoiceWith([line('Discovery', '12.5'), line('Build', '8')])), 1);
@@ -58,29 +74,26 @@ test('notes push to a new page rather than colliding with the totals', async () 
 });
 
 test('a description too long for its column wraps', async () => {
-  const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const lines = wrapText('word '.repeat(60), font, 9.5, 262);
+  const fonts = await fontsFor();
+  const lines = layout('word '.repeat(60), fonts);
   assert.ok(lines.length > 1);
-  for (const l of lines) assert.ok(font.widthOfTextAtSize(l, 9.5) <= 262);
+  for (const l of lines) assert.ok(lineWidth(l) <= COLUMNS_WIDTH);
 });
 
-test('wrapText honors the line breaks already in a description', async () => {
+test('line breaks in a description survive to the page', async () => {
   // The editor could not produce one of these until descriptions became a
-  // textarea, but wrapText has always split on \n and nothing asserted it.
-  // A blank line between paragraphs survives as an empty line.
-  const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const lines = wrapText('Environment restoration\n\nRepo and dependency audit', font, 9.5, 262);
-  assert.deepEqual(lines, ['Environment restoration', '', 'Repo and dependency audit']);
+  // textarea in 1.1.1. A blank line between paragraphs survives as an empty
+  // line rather than being folded away, which is the one place this subset
+  // deliberately parts company with CommonMark.
+  const fonts = await fontsFor();
+  const lines = layout('Environment restoration\n\nRepo and dependency audit', fonts);
+  assert.deepEqual(lines.map(lineText), ['Environment restoration', '', 'Repo and dependency audit']);
 });
 
 test('a line break makes the row taller, the same way a wrap does', async () => {
-  const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const one = planPages(invoiceWith([line('Environment restoration')]), { font, bold });
-  const two = planPages(invoiceWith([line('Environment restoration\nand verification')]), { font, bold });
+  const fonts = await fontsFor();
+  const one = planPages(invoiceWith([line('Environment restoration')]), fonts);
+  const two = planPages(invoiceWith([line('Environment restoration\nand verification')]), fonts);
   assert.ok(two.pages[0][0].height > one.pages[0][0].height);
 });
 
@@ -92,11 +105,10 @@ test('a multi-line description draws one line per break', async () => {
 });
 
 test('an unbroken token wider than the column is split, not overflowed', async () => {
-  const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const fonts = await fontsFor();
   const url = `https://example.com/${'a'.repeat(300)}`;
-  const lines = wrapText(url, font, 9.5, 262);
-  for (const l of lines) assert.ok(font.widthOfTextAtSize(l, 9.5) <= 262);
+  const lines = layout(url, fonts);
+  for (const l of lines) assert.ok(lineWidth(l) <= COLUMNS_WIDTH);
 });
 
 test('characters outside WinAnsi do not crash generation', async () => {
@@ -125,9 +137,7 @@ test('pagination reacts to the actual header height, not an assumed one', async 
   // client with more address lines pushed rows below the bottom margin, and a
   // short header wasted a third of the first page. Neither shows up as an
   // error — the PDF renders either way — so only a row count catches it.
-  const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const fonts = await fontsFor();
 
   const tallClient = makeClient({
     name: 'A Company With A Long Name, LLC', contactName: 'Wile E. Coyote',
@@ -137,7 +147,7 @@ test('pagination reacts to the actual header height, not an assumed one', async 
 
   const items = Array.from({ length: 40 }, (_, i) => line(`Item ${i + 1}`));
   const plan = (c) => planPages(
-    invoiceWith(items, { billTo: snapshotClient(c) }), { font, bold },
+    invoiceWith(items, { billTo: snapshotClient(c) }), fonts,
   );
 
   const tall = plan(tallClient);
@@ -150,13 +160,11 @@ test('pagination reacts to the actual header height, not an assumed one', async 
 });
 
 test('no page is filled past the bottom margin', async () => {
-  const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const fonts = await fontsFor();
 
   for (const count of [1, 12, 23, 24, 25, 40, 80]) {
     const items = Array.from({ length: count }, (_, i) => line(`Item ${i + 1} with a description long enough to sometimes wrap onto a second line`));
-    const { pages, firstHeader, contHeader, capacityOf } = planPages(invoiceWith(items), { font, bold });
+    const { pages, firstHeader, contHeader, capacityOf } = planPages(invoiceWith(items), fonts);
     pages.forEach((rows, i) => {
       const used = rows.reduce((sum, r) => sum + r.height, 0);
       const available = capacityOf(i === 0 ? firstHeader : contHeader);
@@ -171,13 +179,11 @@ test('a line item taller than a whole page is split, not drawn off the page', as
   // stops an infinite run of empty pages also placed it regardless of height,
   // and it was drawn straight through the bottom margin. The sweep below only
   // used short descriptions, so nothing caught it.
-  const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const fonts = await fontsFor();
 
   const huge = line('word '.repeat(400), '2', '150');
   const { pages, firstHeader, contHeader, capacityOf, totalCents } = planPages(
-    invoiceWith([huge]), { font, bold },
+    invoiceWith([huge]), fonts,
   );
 
   assert.ok(pages.length > 1, 'the row needed more than one page');
@@ -196,15 +202,13 @@ test('a line item taller than a whole page is split, not drawn off the page', as
 });
 
 test('a split row keeps every word of its description', async () => {
-  const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const fonts = await fontsFor();
 
   // Distinct tokens, so a dropped or duplicated chunk is visible.
   const words = Array.from({ length: 900 }, (_, i) => `w${i}`).join(' ');
-  const { pages } = planPages(invoiceWith([line(words)]), { font, bold });
+  const { pages } = planPages(invoiceWith([line(words)]), fonts);
 
-  const drawn = pages.flat().flatMap((r) => r.lines).join(' ').split(/\s+/).filter(Boolean);
+  const drawn = pages.flat().flatMap((r) => r.lines.map(lineText)).join(' ').split(/\s+/).filter(Boolean);
   assert.deepEqual(drawn, words.split(' '), 'no word is lost or repeated across the break');
 });
 
@@ -241,15 +245,13 @@ test('long-form dates never collide with their metadata labels', async () => {
 });
 
 test('every row in a table is the same height as its neighbors', async () => {
-  const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const fonts = await fontsFor();
 
   // Single-line rows must all measure identically, including the first, which
   // used to sit tighter because the header rule and the inter-row rules were
   // offset differently.
   const items = Array.from({ length: 5 }, (_, i) => line(`Item ${i + 1}`));
-  const { pages } = planPages(invoiceWith(items), { font, bold });
+  const { pages } = planPages(invoiceWith(items), fonts);
   const heights = new Set(pages[0].map((r) => r.height));
   assert.equal(heights.size, 1, `expected uniform row heights, got ${[...heights].join(', ')}`);
 });
@@ -381,4 +383,109 @@ test('every page of a multi-page demo invoice is watermarked', async () => {
 
   const marks = pdfStrings(bytes).filter((t) => t === 'DEMO').length;
   assert.equal(marks, pageCount);
+});
+
+test('bold and italic reach the page in different faces', async () => {
+  const fonts = await fontsFor();
+  const lines = layout('Plain **bold** and *italic* text', fonts);
+  const faces = lines.flatMap((l) => l.segments).map((s) => s.font);
+  assert.ok(faces.includes(fonts.bold), 'a bold run is set in Helvetica-Bold');
+  assert.ok(faces.includes(fonts.italic), 'an italic run is set in Helvetica-Oblique');
+  assert.equal(lines.map(lineText).join(''), 'Plain bold and italic text', 'the markers do not print');
+});
+
+test('a heading is set larger and bolder than the text under it', async () => {
+  const fonts = await fontsFor();
+  const [head] = layout('# Environment restoration', fonts);
+  const [body] = layout('Environment restoration', fonts);
+  assert.ok(head.size > body.size);
+  assert.equal(head.segments[0].font, fonts.bold);
+  assert.equal(body.segments[0].font, fonts.regular);
+});
+
+test('a heading above body text takes more room than two plain lines', async () => {
+  const fonts = await fontsFor();
+  const withHead = planPages(invoiceWith([line('# Restoration\nRepo and dependency audit')]), fonts);
+  const without = planPages(invoiceWith([line('Restoration\nRepo and dependency audit')]), fonts);
+  assert.ok(withHead.pages[0][0].height > without.pages[0][0].height);
+});
+
+test('a wrapped list item hangs under its own text, not under the bullet', async () => {
+  const fonts = await fontsFor();
+  const lines = layout('- an item long enough that it has to wrap onto a second line of this column', fonts);
+  assert.ok(lines.length > 1, 'the item wrapped');
+  assert.equal(lines[0].marker.text, '•');
+  assert.equal(lines[1].marker, undefined, 'a continuation line draws no second bullet');
+  assert.equal(lines[1].indent, lines[0].indent);
+  assert.ok(lines[0].indent > 0);
+  for (const l of lines) assert.ok(lineWidth(l) <= COLUMNS_WIDTH, 'the indent comes out of the column, not past it');
+});
+
+test('an ordered list is renumbered from where it starts', async () => {
+  const fonts = await fontsFor();
+  assert.deepEqual(layout('3. third\n9. fourth\n1. fifth', fonts).map((l) => l.marker.text), ['3.', '4.', '5.']);
+  assert.deepEqual(layout('1. one\n1. two\n1. three', fonts).map((l) => l.marker.text), ['1.', '2.', '3.']);
+});
+
+test('an invoice from before the formatting subset still prints its asterisks', async () => {
+  // The record carries the version it was written under, so re-rendering a
+  // document issued in 2026 produces the document that was issued rather than
+  // today's reading of it.
+  const description = 'Rocket skates **XLR-8** at 2 * 3 crates';
+  const old = invoiceWith([line(description)], { schemaVersion: 1 });
+  assert.match(pdfText(await generateInvoicePdf(old)), /\*\*XLR-8\*\*/);
+
+  const current = pdfText(await generateInvoicePdf(invoiceWith([line(description)])));
+  assert.doesNotMatch(current, /\*\*/, 'the markers are consumed');
+  assert.match(current, /2 \* 3 crates/, 'and arithmetic is still arithmetic');
+});
+
+test('no page is filled past the bottom margin, formatted descriptions included', async () => {
+  // The same sweep as above, and the reason every height here is measured from
+  // the laid-out lines rather than counted: a heading and a list make lines of
+  // three different heights inside one row.
+  const fonts = await fontsFor();
+  const body = '# Environment restoration\nRepo and **dependency** audit after the pause\n\n- local development path established\n- verified against *production*';
+
+  for (const count of [1, 4, 8, 12, 16, 24, 40]) {
+    const items = Array.from({ length: count }, (_, i) => line(`${body}\n${i + 1}. checked`));
+    const { pages, firstHeader, contHeader, capacityOf } = planPages(invoiceWith(items), fonts);
+    pages.forEach((rows, i) => {
+      const used = rows.reduce((sum, r) => sum + r.height, 0);
+      const available = capacityOf(i === 0 ? firstHeader : contHeader);
+      assert.ok(used <= available, `page ${i + 1} of a ${count}-item invoice overflows: ${used} > ${available}`);
+    });
+  }
+});
+
+test('a split row keeps every word of a formatted description', async () => {
+  const fonts = await fontsFor();
+  const words = Array.from({ length: 600 }, (_, i) => (i % 7 ? `w${i}` : `**w${i}**`)).join(' ');
+  const { pages } = planPages(invoiceWith([line(words)]), fonts);
+
+  const drawn = pages.flat().flatMap((r) => r.lines.map(lineText)).join(' ').split(/\s+/).filter(Boolean);
+  assert.deepEqual(drawn, words.replaceAll('**', '').split(' '), 'no word is lost, repeated or unstyled away');
+});
+
+test('the totals and the notes are both reserved for on the last page', async () => {
+  // The reserve and the draw read one constant now. They did not: the measure
+  // pass allowed 24 points above the notes label and the drawer spent 44, so
+  // the block it was protecting from the bottom margin was under-measured by
+  // twenty points.
+  const fonts = await fontsFor();
+  const notes = '# Payment terms\n- ACH preferred, details on request\n- Check payable to ACME Corporation\n\n1. Net 30 from the invoice date\n2. A late fee applies after that';
+
+  for (const count of [10, 18, 20, 21, 22, 23, 24, 26]) {
+    const items = Array.from({ length: count }, (_, i) => line(`Item ${i + 1}`));
+    const { pages, firstHeader, contHeader, capacityOf, notesHeight } = planPages(
+      invoiceWith(items, { notes }), fonts,
+    );
+    const last = pages.length - 1;
+    const used = pages[last].reduce((sum, r) => sum + r.height, 0);
+    const available = capacityOf(last === 0 ? firstHeader : contHeader);
+    assert.ok(
+      used + TOTALS_HEIGHT + notesHeight <= available,
+      `${count} items: the last page needs ${Math.round(used + TOTALS_HEIGHT + notesHeight)} of ${Math.round(available)}`,
+    );
+  }
 });

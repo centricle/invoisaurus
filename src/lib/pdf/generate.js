@@ -16,11 +16,14 @@
  */
 import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
 import {
-  PAGE, CONTENT, SIZE, LEADING, COLUMNS, TOTALS_HEIGHT, META,
-  wrapText, rowHeight, sanitize, firstBaselineY, linesThatFit,
+  PAGE, CONTENT, SIZE, LEADING, COLUMNS, TOTALS_HEIGHT, META, LIST_GAP, sanitize,
 } from './layout.js';
+import {
+  layoutBlocks, rowHeight, blockHeight, firstBaselineY, linesThatFit, baselines,
+} from './richtext.js';
+import { parseMarkup, parsePlain } from '../markup.js';
 import { formatUSD, formatQuantity, lineAmountCents } from '../../money.js';
-import { addressLines, termById, formatLongDate } from '../../schema.js';
+import { addressLines, termById, formatLongDate, MARKUP_SCHEMA_VERSION } from '../../schema.js';
 
 const INK = rgb(0.08, 0.09, 0.11);
 const MUTED = rgb(0.42, 0.45, 0.5);
@@ -29,6 +32,16 @@ const RULE = rgb(0.80, 0.82, 0.85);
 /** Space reserved below the page header for the table's column headings.
  *  The drawer uses 8 of it before the rule; the rest is slack. */
 const TABLE_HEADER = 18;
+
+/**
+ * The notes block: the gap from the totals down to its label, and from the
+ * label down to the first line of text.
+ *
+ * One constant read by both passes. They disagreed before -- the reserve was
+ * 24 and the drawer spent 44 -- which left the measure pass twenty points
+ * optimistic about a block it was supposed to be protecting from the margin.
+ */
+const NOTES = { gapAbove: 44, gapBelow: 0 };
 
 /** A draw operation: left-anchored at `x`, or right-anchored at `right`. */
 const at = (string, opts) => ({ string, ...opts });
@@ -107,16 +120,25 @@ function buildContinuationHeader(invoice, { bold }) {
  * catches the header/paginator disagreement described above, because the
  * failure is silent: the PDF still renders, just with rows below the margin.
  */
-export function planPages(invoice, { font, bold }) {
+export function planPages(invoice, fonts) {
+  const { bold } = fonts;
   const firstHeader = buildHeader(invoice, { bold });
   const contHeader = buildContinuationHeader(invoice, { bold });
 
+  // Which parser runs is the whole of the version gate. A record written
+  // before the formatting subset existed goes through parsePlain, so an
+  // asterisk in a description that was already sent is still an asterisk --
+  // an invoice is a record of what was sent, and that applies to what its
+  // characters meant as much as to the address they went to.
+  const parse = (invoice.schemaVersion ?? 1) >= MARKUP_SCHEMA_VERSION ? parseMarkup : parsePlain;
+  const lay = (text, maxWidth) => layoutBlocks(parse(text), fonts, { maxWidth });
+
   const items = invoice.lineItems.map((li) => {
-    const lines = wrapText(li.description, font, SIZE.body, COLUMNS.description.width);
+    const lines = lay(li.description, COLUMNS.description.width);
     const amountCents = lineAmountCents(li.quantityMilli, li.rateCents);
     return {
       lines,
-      height: rowHeight(lines.length),
+      height: rowHeight(lines),
       quantity: formatQuantity(li.quantityMilli),
       rate: li.rateCents == null ? '' : formatUSD(li.rateCents),
       amount: formatUSD(amountCents),
@@ -124,10 +146,10 @@ export function planPages(invoice, { font, bold }) {
     };
   });
 
-  const noteLines = invoice.notes?.trim()
-    ? wrapText(invoice.notes, font, SIZE.body, CONTENT.width)
-    : [];
-  const notesHeight = noteLines.length ? 24 + noteLines.length * LEADING.body : 0;
+  const noteLines = invoice.notes?.trim() ? lay(invoice.notes, CONTENT.width) : [];
+  const notesHeight = noteLines.length
+    ? NOTES.gapAbove + blockHeight(noteLines) + NOTES.gapBelow
+    : 0;
 
   const capacityOf = (header) => header.endY - TABLE_HEADER - CONTENT.bottom;
 
@@ -165,17 +187,17 @@ export function planPages(invoice, { font, bold }) {
     let rest = item.lines;
     let first = true;
     while (rest.length) {
-      const take = Math.max(1, linesThatFit(remaining));
+      const take = Math.max(1, linesThatFit(rest, remaining));
       const lines = rest.slice(0, take);
       rest = rest.slice(take);
       current.push({
         lines,
-        height: rowHeight(lines.length),
+        height: rowHeight(lines),
         quantity: first ? item.quantity : '',
         rate: first ? item.rate : '',
         amount: first ? item.amount : '',
       });
-      remaining -= rowHeight(lines.length);
+      remaining -= rowHeight(lines);
       first = false;
       if (rest.length) breakPage();
     }
@@ -188,16 +210,31 @@ export function planPages(invoice, { font, bold }) {
   if (remaining < TOTALS_HEIGHT + notesHeight) pages.push([]);
 
   return {
-    pages, firstHeader, contHeader, noteLines,
+    pages, firstHeader, contHeader, noteLines, notesHeight,
     totalCents: items.reduce((sum, item) => sum + item.amountCents, 0),
     capacityOf,
   };
 }
 
+/**
+ * The four faces the drawer needs.
+ *
+ * All four are Standard 14, so the obliques cost the document nothing: no font
+ * file, no fontkit, no embedded bytes. They exist so a description can carry an
+ * italic phrase. Exported because `planPages` takes them, and a test that
+ * measures pagination has to embed the same four.
+ */
+export const embedFonts = async (doc) => ({
+  regular: await doc.embedFont(StandardFonts.Helvetica),
+  bold: await doc.embedFont(StandardFonts.HelveticaBold),
+  italic: await doc.embedFont(StandardFonts.HelveticaOblique),
+  boldItalic: await doc.embedFont(StandardFonts.HelveticaBoldOblique),
+});
+
 export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
   const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const fonts = await embedFonts(doc);
+  const { regular: font, bold } = fonts;
 
   const draw = (page, op) => {
     const string = sanitize(op.string);
@@ -207,13 +244,41 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
     page.drawText(string, { x, y: op.y, size, font: f, color: op.color ?? INK });
   };
 
+  /**
+   * Draw one laid-out line: its marker to the left of the indent, then its
+   * segments left to right, each advancing x by its own measured width.
+   *
+   * Separate from `draw` rather than folded into it. Everything else on the
+   * page -- the header, the metadata column, the table headings, the numbers --
+   * is one string anchored left or right, and rewriting those to go through a
+   * segment list would buy nothing.
+   */
+  const drawLine = (page, line, y, left) => {
+    if (line.marker) {
+      const width = line.marker.font.widthOfTextAtSize(line.marker.text, line.marker.size);
+      page.drawText(line.marker.text, {
+        x: left + line.indent - LIST_GAP - width,
+        y,
+        size: line.marker.size,
+        font: line.marker.font,
+        color: INK,
+      });
+    }
+
+    let x = left + line.indent;
+    for (const segment of line.segments) {
+      page.drawText(segment.text, { x, y, size: segment.size, font: segment.font, color: INK });
+      x += segment.font.widthOfTextAtSize(segment.text, segment.size);
+    }
+  };
+
   const rule = (page, y, color = RULE) => page.drawLine({
     start: { x: CONTENT.left, y }, end: { x: CONTENT.right, y }, thickness: 0.75, color,
   });
 
   // --- Pass one: measure and paginate ---------------------------------------
 
-  const { pages, firstHeader, contHeader, noteLines, totalCents } = planPages(invoice, { font, bold });
+  const { pages, firstHeader, contHeader, noteLines, totalCents } = planPages(invoice, fonts);
 
   // --- Pass two: draw --------------------------------------------------------
 
@@ -243,10 +308,9 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
     // inside and its rule on the bottom edge. Drawing from the top with a fixed
     // pad instead is what made the first row sit tighter than the rest.
     for (const item of rows) {
-      const baseline = firstBaselineY(y, item.height, item.lines.length);
-      item.lines.forEach((line, i) => {
-        draw(page, at(line, { x: COLUMNS.description.x, y: baseline - i * LEADING.body }));
-      });
+      const baseline = firstBaselineY(y, item.height, item.lines);
+      const ys = baselines(baseline, item.lines);
+      item.lines.forEach((line, i) => drawLine(page, line, ys[i], COLUMNS.description.x));
       draw(page, at(item.quantity, { right: COLUMNS.quantity.right, y: baseline }));
       draw(page, at(item.rate, { right: COLUMNS.rate.right, y: baseline }));
       draw(page, at(item.amount, { right: COLUMNS.amount.right, y: baseline }));
@@ -261,12 +325,10 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
       draw(page, at(formatUSD(totalCents), { right: COLUMNS.amount.right, y: y - 3, size: SIZE.total, font: bold }));
 
       if (noteLines.length) {
-        y -= 44;
+        y -= NOTES.gapAbove;
         draw(page, at('NOTES', { x: CONTENT.left, y, size: SIZE.small, color: MUTED, font: bold }));
-        for (const line of noteLines) {
-          y -= LEADING.body;
-          draw(page, at(line, { x: CONTENT.left, y }));
-        }
+        const first = y - noteLines[0].leading;
+        baselines(first, noteLines).forEach((lineY, i) => drawLine(page, noteLines[i], lineY, CONTENT.left));
       }
     }
 
