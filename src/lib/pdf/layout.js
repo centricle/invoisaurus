@@ -3,9 +3,10 @@
  *
  * Coordinates are pdf-lib's: origin bottom-left, units in points, 72 to the
  * inch. This module holds the fixed geometry -- page box, margins, column
- * positions, type sizes -- and the measurement helpers. generate.js decides
- * what is drawn, and derives the positions that depend on how much content
- * there turned out to be.
+ * positions, type sizes -- and the character folding every string passes
+ * through. richtext.js turns parsed blocks into lines against this geometry;
+ * generate.js decides what is drawn, and derives the positions that depend on
+ * how much content there turned out to be.
  */
 
 export const PAGE = { width: 612, height: 792 }; // US Letter
@@ -21,6 +22,18 @@ export const CONTENT = {
 
 export const SIZE = { title: 20, heading: 10, body: 9.5, small: 8, total: 13 };
 export const LEADING = { body: 13, tight: 11 };
+
+/**
+ * A heading inside a description or a notes block.
+ *
+ * `spaceAbove` applies only when something precedes it. A heading opening a
+ * description has nothing to separate itself from, and the space would just
+ * push the text off-center in its row.
+ */
+export const SUBHEAD = { size: 11, leading: 15, spaceAbove: 6 };
+
+/** Gap between a list marker and the text it introduces. */
+export const LIST_GAP = 4;
 
 /** Column geometry for the line-item table. Numeric columns are right-aligned. */
 export const COLUMNS = {
@@ -44,13 +57,6 @@ export const ROW = { padding: 9, minHeight: 30 };
 
 /** Approximate vertical metrics for Helvetica, as fractions of font size. */
 export const METRICS = { cap: 0.72, descender: 0.21 };
-
-/**
- * Visual height of a wrapped text block: cap height of the first line, the
- * leading between lines, and the descender of the last.
- */
-export const textBlockHeight = (lineCount, size = SIZE.body, leading = LEADING.body) =>
-  (METRICS.cap + METRICS.descender) * size + (lineCount - 1) * leading;
 
 /** Vertical space the totals block needs, so pagination can reserve it. */
 export const TOTALS_HEIGHT = 58;
@@ -95,76 +101,4 @@ export function sanitize(text) {
     // Unrepresentable. Drop it rather than drawing a wrong glyph.
   }
   return out;
-}
-
-/**
- * Break text to fit a column, honoring existing newlines.
- *
- * A single word wider than the column is split mid-word rather than allowed to
- * run past the column edge — long URLs in a line-item description are the
- * common case.
- */
-export function wrapText(text, font, size, maxWidth) {
-  const paragraphs = sanitize(text).split('\n');
-  const lines = [];
-
-  for (const paragraph of paragraphs) {
-    const words = paragraph.split(/\s+/).filter(Boolean);
-    if (!words.length) { lines.push(''); continue; }
-
-    let line = '';
-    for (const word of words) {
-      const candidate = line ? `${line} ${word}` : word;
-      if (font.widthOfTextAtSize(candidate, size) <= maxWidth) { line = candidate; continue; }
-      if (line) lines.push(line);
-
-      if (font.widthOfTextAtSize(word, size) > maxWidth) {
-        let chunk = '';
-        for (const char of word) {
-          if (chunk && font.widthOfTextAtSize(chunk + char, size) > maxWidth) {
-            lines.push(chunk);
-            chunk = char;
-          } else chunk += char;
-        }
-        line = chunk;
-      } else line = word;
-    }
-    if (line) lines.push(line);
-  }
-
-  return lines.length ? lines : [''];
-}
-
-export const rowHeight = (lineCount) =>
-  Math.max(ROW.minHeight, textBlockHeight(lineCount) + 2 * ROW.padding);
-
-/**
- * The inverse of `rowHeight`: the most description lines that fit in `height`.
- *
- * Pagination normally moves a row that does not fit onto the next page whole,
- * which is right for every row that fits on a page at all. A description long
- * enough to be taller than a whole page has no next page to move to, and was
- * simply drawn past the bottom margin -- silently, because the PDF renders
- * either way. Splitting it needs this measurement.
- *
- * Zero when not even a single-line row fits.
- */
-export function linesThatFit(height, size = SIZE.body, leading = LEADING.body) {
-  if (height < rowHeight(1)) return 0;
-  const block = height - 2 * ROW.padding - (METRICS.cap + METRICS.descender) * size;
-  return Math.max(1, Math.floor(block / leading) + 1);
-}
-
-/**
- * Baseline of a row's first line so the block sits centered in its box.
- *
- * Rows were previously drawn from the top with a fixed pad, which left the text
- * riding high and put a two-line description almost on top of the rule below
- * it. Centering also makes the first row match every other row, which it did
- * not when the table header's rule and the inter-row rules used different
- * offsets.
- */
-export function firstBaselineY(boxTop, boxHeight, lineCount, size = SIZE.body) {
-  const block = textBlockHeight(lineCount, size);
-  return boxTop - (boxHeight - block) / 2 - METRICS.cap * size;
 }

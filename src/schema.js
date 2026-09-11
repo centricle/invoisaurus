@@ -8,7 +8,22 @@
  */
 import { lineAmountCents, sumCents, formatUSD, MAX_CENTS } from './money.js';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
+
+/**
+ * The version at which the meaning of `description` and `notes` changed.
+ *
+ * Version 1 records held plain text. Version 2 records hold the formatting
+ * subset in src/lib/markup.js, where `*` opens emphasis and a line beginning
+ * `- ` is a bullet. That is a change to what a stored string *means*, which is
+ * what a schema version is for, and it is why an invoice carries its own:
+ * re-rendering a document issued in 2026 must produce the document that was
+ * issued, not today's reading of it.
+ *
+ * Only src/lib/pdf/generate.js consults this. Everything else treats both
+ * versions identically, because the record shape is the same.
+ */
+export const MARKUP_SCHEMA_VERSION = 2;
 
 export const CLIENT_TYPES = ['business', 'individual'];
 
@@ -133,7 +148,10 @@ export function makeInvoice(input = {}) {
   const issueDate = input.issueDate || today();
   const terms = input.terms || 'net30';
   return {
-    schemaVersion: SCHEMA_VERSION,
+    // Preserved, not stamped. A record keeps the version it was written under
+    // for its whole life, so editing an invoice from before the formatting
+    // subset does not silently reinterpret the text already on it.
+    schemaVersion: input.schemaVersion ?? SCHEMA_VERSION,
     id: input.id || '',            // the formatted number, e.g. ACM-0001
     number: input.number ?? null,  // the raw integer, for sorting
     vendorId: input.vendorId || '',

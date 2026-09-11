@@ -136,14 +136,26 @@
         </tr>
       </tfoot>
     </table>
-    <p class="mt-2 text-xs text-slate-500">A description can run to several lines. Enter starts a new one.</p>
+    <p class="mt-2 text-xs text-slate-500">
+      A description can run to several lines. <code class="text-slate-400">**bold**</code> ·
+      <code class="text-slate-400">*italic*</code> ·
+      <code class="text-slate-400"># heading</code> ·
+      <code class="text-slate-400">- list</code> ·
+      <code class="text-slate-400">1. list</code>
+    </p>
   </div>
 
   <label class="block max-w-2xl">
     <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Notes</span>
     <textarea name="notes" rows="3" data-autogrow
               class="w-full resize-none rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none"><%= invoice.notes %></textarea>
-    <p class="mt-1 text-xs text-slate-500">Optional. Prints at the bottom of the invoice.</p>
+    <p class="mt-1 text-xs text-slate-500">
+      Optional. Prints at the bottom of the invoice. <code class="text-slate-400">**bold**</code> ·
+      <code class="text-slate-400">*italic*</code> ·
+      <code class="text-slate-400"># heading</code> ·
+      <code class="text-slate-400">- list</code> ·
+      <code class="text-slate-400">1. list</code>
+    </p>
   </label>
 
   <div class="flex items-center gap-3 border-t border-slate-900 pt-6">
