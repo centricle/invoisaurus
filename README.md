@@ -189,6 +189,36 @@ never alters a past invoice, because an invoice is a record of what was sent.
 **Invoice numbers are per-vendor.** The number is the issuing entity's book.
 Each vendor carries its own prefix, padding and counter.
 
+### Formatting
+
+A line-item description and the notes block accept a small formatting subset.
+
+| Type this | Get this |
+|---|---|
+| `# Heading` | a bold heading, one size up |
+| `**bold**` or `__bold__` | bold |
+| `*italic*` or `_italic_` | italic |
+| `- item` | a bulleted list |
+| `1. item` | a numbered list, renumbered from the number you start with |
+| `\*` | a literal asterisk |
+
+**Everything else prints as you typed it.** There is one heading level, lists do
+not nest, and `*` at the start of a line is emphasis rather than a bullet. A
+marker with no closing partner is just a character, so `2 items * 3 crates` is
+arithmetic and `file_v2_final.pdf` is a filename.
+
+This is a subset of CommonMark rather than a dialect of it, with one deliberate
+difference: **a line break is a line break.** CommonMark folds consecutive lines
+into one paragraph. Here each line prints where you put it, because that is what
+the field did before any of this existed.
+
+**An invoice keeps the rules it was written under.** Every record carries a
+schema version, and one written before this feature renders as plain text
+forever, asterisks and all. Re-rendering a document you sent last year has to
+produce the document you sent, not today's reading of it. Editing such an
+invoice does not change that either, so nothing is reinterpreted behind your
+back.
+
 ## Configuration
 
 | Variable | Default | Effect |
@@ -268,7 +298,8 @@ every pull request, against the Node version pinned in `.nvmrc`.
 | `src/demo.js` | Per-session demo stores, seeding, and the reset |
 | `src/fixtures/acme.js` | The ACME cast, shared by the seeder and the demo |
 | `src/money.js` | Integer-cent arithmetic and formatting |
-| `src/lib/pdf/` | `layout.js` decides where things go, `generate.js` draws them |
+| `src/lib/markup.js` | The formatting subset, text to blocks. Knows nothing about PDFs |
+| `src/lib/pdf/` | `layout.js` holds the geometry, `richtext.js` turns blocks into lines, `generate.js` draws them |
 | `src/routes/` | One router each for invoices, clients, vendors |
 | `src/views/` | EJS templates |
 | `public/js/` | Browser-side behavior: the invoice editor, and the number steppers on the vendor and invoice forms |
