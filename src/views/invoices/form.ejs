@@ -99,8 +99,8 @@
         <% invoice.lineItems.forEach((li, i) => { %>
           <tr data-line-item>
             <td class="py-2 pr-3">
-              <input type="text" name="description[]" value="<%= li.description %>"
-                     class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+              <textarea name="description[]" rows="1" data-autogrow
+                        class="w-full resize-none rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none"><%= li.description %></textarea>
             </td>
             <td class="py-2 pr-3">
               <input name="quantity[]" type="number" step="any" min="0" inputmode="decimal" data-stepper data-step-amount="0.25" value="<%= quantityInputValue(li.quantityMilli) %>"
@@ -136,12 +136,13 @@
         </tr>
       </tfoot>
     </table>
+    <p class="mt-2 text-xs text-slate-500">A description can run to several lines. Enter starts a new one.</p>
   </div>
 
   <label class="block max-w-2xl">
     <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Notes</span>
-    <textarea name="notes" rows="3"
-              class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none"><%= invoice.notes %></textarea>
+    <textarea name="notes" rows="3" data-autogrow
+              class="w-full resize-none rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none"><%= invoice.notes %></textarea>
     <p class="mt-1 text-xs text-slate-500">Optional. Prints at the bottom of the invoice.</p>
   </label>
 
@@ -181,8 +182,8 @@
 <template id="line-item-template">
   <tr data-line-item>
     <td class="py-2 pr-3">
-      <input type="text" name="description[]"
-             class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+      <textarea name="description[]" rows="1" data-autogrow
+                class="w-full resize-none rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none"></textarea>
     </td>
     <td class="py-2 pr-3">
       <input name="quantity[]" type="number" step="any" min="0" inputmode="decimal" data-stepper data-step-amount="0.25"

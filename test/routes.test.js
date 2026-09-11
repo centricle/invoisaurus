@@ -365,3 +365,28 @@ test('a flash code the app did not write renders nothing', async () => {
     assert.ok(!body.includes('role="status"'), `${cookie} must not render a banner at all`);
   }
 });
+
+test('a multi-line description survives the round trip to the PDF', async () => {
+  await post('/invoices', {
+    vendorId: vendor.id,
+    clientId: client.id,
+    issueDate: '2026-09-02',
+    terms: 'net30',
+    status: 'draft',
+    'description[]': 'Environment restoration\r\nRepo and dependency audit',
+    'quantity[]': '1',
+    'rate[]': '150',
+  });
+
+  const saved = store.getInvoice('ACM-0001');
+  assert.equal(
+    saved.lineItems[0].description,
+    'Environment restoration\nRepo and dependency audit',
+    'the record carries a line feed and no carriage return',
+  );
+
+  const res = await fetch(`${base}/invoices/ACM-0001/pdf`);
+  const text = pdfText(Buffer.from(await res.arrayBuffer()));
+  assert.match(text, /Environment restoration/);
+  assert.match(text, /Repo and dependency audit/);
+});

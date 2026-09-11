@@ -83,6 +83,17 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
+/* Auto-growing fields. The height is measured and written by
+   public/js/invoice-editor.js; a scrollbar would be part of what it measures,
+   so the field would settle one step short of the text it holds.
+   `block` because a textarea is inline by default, and the descender space
+   under its line box made the description cell taller than the cell beside it
+   -- both controls were 47px and sat three pixels apart. */
+textarea[data-autogrow] {
+  display: block;
+  overflow-y: hidden;
+}
+
 .stepper {
   position: relative;
   display: block;
