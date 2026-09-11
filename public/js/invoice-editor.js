@@ -49,6 +49,27 @@
 
   const rows = () => Array.from(tbody.querySelectorAll('[data-line-item]'));
 
+  /**
+   * Size a field to its content.
+   *
+   * A description used to be a single-line input, so a long one scrolled
+   * sideways out of sight while you were typing the thing the client reads.
+   * CSS `field-sizing: content` does this in one line but Firefox does not
+   * implement it, and the reset to `auto` first is what lets the field shrink
+   * again after a deletion rather than only ever growing.
+   *
+   * Writes `style.height` and nothing else. Touching `.value` here would make
+   * the unsaved-changes guard below see a freshly loaded page as edited.
+   */
+  const autogrow = (el) => {
+    el.style.height = 'auto';
+    // scrollHeight measures the padding box, but the field is border-box, so
+    // the borders have to be added back. Without them every description sat
+    // two pixels shorter than the quantity input beside it.
+    const borders = el.offsetHeight - el.clientHeight;
+    el.style.height = `${el.scrollHeight + borders}px`;
+  };
+
   function recalculate() {
     let total = 0;
     for (const row of rows()) {
@@ -75,6 +96,7 @@
       row.querySelector('[name="rate[]"]').value = previous.querySelector('[name="rate[]"]').value;
     }
     tbody.appendChild(row);
+    autogrow(row.querySelector('[data-autogrow]'));
     recalculate();
     row.querySelector('[name="description[]"]').focus();
   }
@@ -93,6 +115,7 @@
   }
 
   form.addEventListener('input', (e) => {
+    if (e.target.matches('[data-autogrow]')) autogrow(e.target);
     if (e.target.matches('[name="quantity[]"], [name="rate[]"]')) recalculate();
     if (e.target === dueDateEl) dueDateTouched = true;
     if (e.target === issueDateEl || e.target === termsEl) syncDueDate();
@@ -114,6 +137,7 @@
     }
   });
 
+  for (const el of form.querySelectorAll('[data-autogrow]')) autogrow(el);
   recalculate();
 })();
 
