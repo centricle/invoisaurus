@@ -34,7 +34,17 @@ invoicesRouter.param('id', (req, res, next, id) => {
  * `rate[]`) rather than indexed keys, so adding and removing rows in the
  * browser never has to renumber anything. Rows that are entirely blank are
  * dropped: a trailing empty row is how a form looks, not something to bill.
+ *
+ * `text` normalizes line endings because a browser submits a textarea's value
+ * with CRLF, and nothing downstream strips the carriage returns -- they would
+ * be written to the record verbatim and read back into the editor. The PDF is
+ * no help in catching that: its sanitize() drops a bare \r, so the document
+ * looks right while the record does not. Stringifying first also keeps a
+ * duplicated field name, which qs parses into an array, from throwing on
+ * .trim().
  */
+const text = (value) => String(value ?? '').replace(/\r\n?/g, '\n').trim();
+
 function lineItemsFromForm(body) {
   const asArray = (v) => (v == null ? [] : [].concat(v));
   // qs parses the `name[]` form fields into plain array keys.
@@ -44,7 +54,7 @@ function lineItemsFromForm(body) {
 
   return descriptions
     .map((description, i) => ({
-      description: String(description || '').trim(),
+      description: text(description),
       quantityMilli: parseQuantity(quantities[i]),
       rateCents: parseCents(rates[i]),
     }))
@@ -58,7 +68,7 @@ const invoiceFromForm = (body) => ({
   terms: body.terms || 'net30',
   dueDate: body.dueDate || dueDateFor(body.issueDate || today(), body.terms || 'net30'),
   status: body.status || 'draft',
-  notes: (body.notes || '').trim(),
+  notes: text(body.notes),
   lineItems: lineItemsFromForm(body),
 });
 

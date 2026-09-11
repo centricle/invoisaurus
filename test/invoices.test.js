@@ -94,3 +94,29 @@ test('validation without refs still checks the ids are present', () => {
   });
   assert.deepEqual(validateInvoice(invoice), []);
 });
+
+test('a multi-line description keeps its breaks, normalized to \\n', () => {
+  // A browser submits a textarea's value with CRLF. Stored verbatim the
+  // carriage returns round-trip back into the editor, and the PDF's sanitize()
+  // drops them on the way out -- so the document would look right while the
+  // record on disk did not.
+  const items = lineItemsFromForm({
+    description: '\r\nEnvironment restoration\r\nRepo and dependency audit\r\n',
+    quantity: '1',
+    rate: '150',
+  });
+  assert.equal(items[0].description, 'Environment restoration\nRepo and dependency audit');
+
+  const invoice = invoiceFromForm({
+    vendorId: 'v', clientId: 'c', issueDate: '2026-09-02', terms: 'net30',
+    notes: 'Due in 30 days.\r\n\r\nACH preferred.',
+  });
+  assert.equal(invoice.notes, 'Due in 30 days.\n\nACH preferred.');
+});
+
+test('a duplicated field name does not throw on its way to validation', () => {
+  // qs parses a repeated `notes` into an array, and the old `(v || '').trim()`
+  // threw a TypeError on it -- a 500 where a validation message belongs.
+  const invoice = invoiceFromForm({ vendorId: 'v', clientId: 'c', notes: ['one', 'two'] });
+  assert.equal(typeof invoice.notes, 'string');
+});
