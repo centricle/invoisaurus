@@ -183,7 +183,17 @@
       relying on it. invoice-editor.js binds the handler. %>
   <form method="post" action="<%= u('/invoices/' + (invoice.id) + '/delete') %>" class="mt-10"
         data-delete-invoice="<%= invoice.id %>">
-    <button type="submit" class="text-xs text-slate-600 hover:text-red-400">Delete this invoice</button>
+    <button type="submit"
+            class="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-red-400">
+      <svg viewBox="0 0 20 20" aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor"
+           stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3.5 5.5h13" />
+        <path d="M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5" />
+        <path d="M5.5 5.5v10A1.5 1.5 0 0 0 7 17h6a1.5 1.5 0 0 0 1.5-1.5v-10" />
+        <path d="M8.5 8.5v5" /><path d="M11.5 8.5v5" />
+      </svg>
+      Delete this invoice
+    </button>
   </form>
 <% } %>
 
