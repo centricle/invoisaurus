@@ -37,6 +37,31 @@ export const TERMS = [
 
 export const INVOICE_STATUSES = ['draft', 'sent', 'paid', 'void'];
 
+/**
+ * The visual styles an invoice may be drawn in.
+ *
+ * The drawers themselves live in src/lib/pdf/styles/. This list is here, with
+ * the statuses and the terms, because it is part of what a record may say --
+ * and because a schema.js that imported the drawers would close a cycle
+ * (classic.js needs addressLines and termById from this file) and drag pdf-lib
+ * into every route and every test that touches a record. A test asserts the
+ * two lists agree.
+ *
+ * Classic is first, and first is the fallback: an invoice written before this
+ * existed carries no style at all, and it was sent in Classic.
+ */
+export const INVOICE_STYLES = [
+  { id: 'classic', label: 'Classic' },
+  { id: 'modern', label: 'Modern' },
+];
+
+export const DEFAULT_STYLE = INVOICE_STYLES[0].id;
+
+export const styleById = (id) => INVOICE_STYLES.find((s) => s.id === id) || INVOICE_STYLES[0];
+
+/** A style id a record may hold: a known one, or the fallback. */
+export const styleId = (id) => (INVOICE_STYLES.some((s) => s.id === id) ? id : DEFAULT_STYLE);
+
 export const termById = (id) => TERMS.find((t) => t.id === id) || TERMS[0];
 
 /** Dates are stored as plain `YYYY-MM-DD` strings, never Date objects. A due
@@ -79,6 +104,10 @@ export function makeVendor(input = {}) {
     numberPrefix: input.numberPrefix ?? '',
     numberPad: Number(input.numberPad ?? 4),
     nextNumber: Number(input.nextNumber ?? 1),
+    // The style new invoices from this vendor start in. It is copied onto the
+    // invoice at creation and never read again, so changing it here does not
+    // restyle anything already issued.
+    defaultStyle: styleId(input.defaultStyle),
     createdAt: input.createdAt || new Date().toISOString(),
   };
 }
@@ -164,6 +193,7 @@ export function makeInvoice(input = {}) {
     lineItems: (input.lineItems || []).map(makeLineItem),
     notes: input.notes || '',
     status: INVOICE_STATUSES.includes(input.status) ? input.status : 'draft',
+    style: styleId(input.style),
     createdAt: input.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

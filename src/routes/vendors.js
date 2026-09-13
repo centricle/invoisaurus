@@ -9,6 +9,7 @@ const fromForm = (body) => ({
   name: (body.name || '').trim(),
   email: (body.email || '').trim(),
   numberPrefix: (body.numberPrefix || '').trim(),
+  defaultStyle: body.defaultStyle,
   numberPad: Number(body.numberPad),
   nextNumber: Number(body.nextNumber),
   address: {
