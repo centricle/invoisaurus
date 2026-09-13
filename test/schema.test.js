@@ -238,3 +238,37 @@ test('every style offered has an id and a label', () => {
     assert.ok(style.label && typeof style.label === 'string');
   }
 });
+
+test('a name the PDF cannot print is refused, and the character is named', () => {
+  // An embedded face does not throw on a missing glyph the way a standard one
+  // does -- it draws .notdef. So a name with the wrong character in it reaches
+  // the client looking like a name with a hole in it, and nothing reports it.
+  // Catching it at the form is the only place anyone finds out.
+  const [error] = validateClient({ name: 'Zhāng Wei', type: 'business' });
+  assert.match(error, /Legal name cannot use/);
+  assert.match(error, /ā \(U\+0101\)/, 'the character and its code point, because some of them are invisible');
+
+  assert.deepEqual(validateClient({ name: "Renée O'Brien & Co", type: 'business' }), [],
+    'everything WinAnsi can represent still saves');
+});
+
+test('every identity field is checked, and the rest are left to sanitize', () => {
+  const errors = validateClient({
+    name: 'ACME', displayName: 'ACME 中', contactName: 'Wile 文', type: 'business',
+  });
+  assert.equal(errors.length, 2);
+  assert.match(errors[0], /^Display name cannot use/);
+  assert.match(errors[1], /^Primary contact cannot use/);
+
+  const vendor = validateVendor({
+    name: 'ACME 中', numberPrefix: 'ACM-', numberPad: 4, nextNumber: 1,
+  });
+  assert.equal(vendor.length, 1);
+  assert.match(vendor[0], /^Company name cannot use/);
+});
+
+test('a blank name reports that it is missing, not that it is unprintable', () => {
+  const errors = validateClient({ name: '', type: 'business' });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /required/);
+});
