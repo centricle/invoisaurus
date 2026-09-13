@@ -16,8 +16,9 @@
  */
 import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
 import {
-  PAGE, CONTENT, SIZE, LEADING, COLUMNS, TOTALS_HEIGHT, META, LIST_GAP, sanitize,
+  PAGE, CONTENT, SIZE, LEADING, COLUMNS, TOTALS_HEIGHT, META, LIST_GAP,
 } from './layout.js';
+import { text, rule as ruleOp, render } from './ops.js';
 import {
   layoutBlocks, rowHeight, blockHeight, firstBaselineY, linesThatFit, baselines,
 } from './richtext.js';
@@ -43,9 +44,6 @@ const TABLE_HEADER = 18;
  */
 const NOTES = { gapAbove: 44, gapBelow: 0 };
 
-/** A draw operation: left-anchored at `x`, or right-anchored at `right`. */
-const at = (string, opts) => ({ string, ...opts });
-
 /**
  * Build the first-page header.
  *
@@ -58,17 +56,17 @@ function buildHeader(invoice, { bold }) {
   const ops = [];
 
   const titleY = CONTENT.top - SIZE.title;
-  ops.push(at(vendor.name || '', { x: CONTENT.left, y: titleY, size: SIZE.title, font: bold }));
-  ops.push(at('INVOICE', { right: CONTENT.right, y: titleY, size: SIZE.title, color: MUTED, font: bold }));
+  ops.push(text(vendor.name || '', { x: CONTENT.left, y: titleY, size: SIZE.title, font: bold }));
+  ops.push(text('INVOICE', { right: CONTENT.right, y: titleY, size: SIZE.title, color: MUTED, font: bold }));
 
   // Remit-from block, left column.
   let leftY = titleY - 20;
   for (const line of addressLines(vendor.address)) {
-    ops.push(at(line, { x: CONTENT.left, y: leftY, color: MUTED }));
+    ops.push(text(line, { x: CONTENT.left, y: leftY, color: MUTED }));
     leftY -= LEADING.tight;
   }
   if (vendor.email) {
-    ops.push(at(vendor.email, { x: CONTENT.left, y: leftY, color: MUTED }));
+    ops.push(text(vendor.email, { x: CONTENT.left, y: leftY, color: MUTED }));
     leftY -= LEADING.tight;
   }
 
@@ -80,23 +78,23 @@ function buildHeader(invoice, { bold }) {
     ['Terms', termById(invoice.terms).label],
     ['Payment Due', formatLongDate(invoice.dueDate)],
   ]) {
-    ops.push(at(label, { right: META.labelRight, y: metaY, color: MUTED }));
-    ops.push(at(String(value), { right: CONTENT.right, y: metaY, font: bold }));
+    ops.push(text(label, { right: META.labelRight, y: metaY, color: MUTED }));
+    ops.push(text(String(value), { right: CONTENT.right, y: metaY, font: bold }));
     metaY -= LEADING.body;
   }
 
   // Bill To sits below whichever column ran longer.
   let billY = Math.min(leftY, metaY) - 24;
-  ops.push(at('BILL TO', { x: CONTENT.left, y: billY, size: SIZE.small, color: MUTED, font: bold }));
+  ops.push(text('BILL TO', { x: CONTENT.left, y: billY, size: SIZE.small, color: MUTED, font: bold }));
   billY -= LEADING.body + 2;
-  ops.push(at(client.name || '', { x: CONTENT.left, y: billY, font: bold }));
+  ops.push(text(client.name || '', { x: CONTENT.left, y: billY, font: bold }));
   billY -= LEADING.tight;
   if (client.contactName) {
-    ops.push(at(`Attn: ${client.contactName}`, { x: CONTENT.left, y: billY }));
+    ops.push(text(`Attn: ${client.contactName}`, { x: CONTENT.left, y: billY }));
     billY -= LEADING.tight;
   }
   for (const line of addressLines(client.address)) {
-    ops.push(at(line, { x: CONTENT.left, y: billY }));
+    ops.push(text(line, { x: CONTENT.left, y: billY }));
     billY -= LEADING.tight;
   }
 
@@ -107,7 +105,7 @@ function buildHeader(invoice, { bold }) {
 function buildContinuationHeader(invoice, { bold }) {
   const y = CONTENT.top - 12;
   return {
-    ops: [at(`${invoice.id} (continued)`, { x: CONTENT.left, y, size: SIZE.heading, font: bold })],
+    ops: [text(`${invoice.id} (continued)`, { x: CONTENT.left, y, size: SIZE.heading, font: bold })],
     endY: CONTENT.top - 40,
   };
 }
@@ -236,13 +234,7 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
   const fonts = await embedFonts(doc);
   const { regular: font, bold } = fonts;
 
-  const draw = (page, op) => {
-    const string = sanitize(op.string);
-    const size = op.size ?? SIZE.body;
-    const f = op.font ?? font;
-    const x = op.right != null ? op.right - f.widthOfTextAtSize(string, size) : op.x;
-    page.drawText(string, { x, y: op.y, size, font: f, color: op.color ?? INK });
-  };
+  const draw = (page, op) => render(page, op, { font, ink: INK });
 
   /**
    * Draw one laid-out line: its marker to the left of the indent, then its
@@ -272,9 +264,8 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
     }
   };
 
-  const rule = (page, y, color = RULE) => page.drawLine({
-    start: { x: CONTENT.left, y }, end: { x: CONTENT.right, y }, thickness: 0.75, color,
-  });
+  const rule = (page, y, color = RULE) =>
+    draw(page, ruleOp({ x: CONTENT.left, right: CONTENT.right, y, color }));
 
   // --- Pass one: measure and paginate ---------------------------------------
 
@@ -296,10 +287,10 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
     // table label nothing, so the table head is drawn only when there is a
     // table under it.
     if (rows.length) {
-      draw(page, at('DESCRIPTION', { x: COLUMNS.description.x, y, size: SIZE.small, color: MUTED, font: bold }));
-      draw(page, at('QTY', { right: COLUMNS.quantity.right, y, size: SIZE.small, color: MUTED, font: bold }));
-      draw(page, at('RATE', { right: COLUMNS.rate.right, y, size: SIZE.small, color: MUTED, font: bold }));
-      draw(page, at('AMOUNT', { right: COLUMNS.amount.right, y, size: SIZE.small, color: MUTED, font: bold }));
+      draw(page, text('DESCRIPTION', { x: COLUMNS.description.x, y, size: SIZE.small, color: MUTED, font: bold }));
+      draw(page, text('QTY', { right: COLUMNS.quantity.right, y, size: SIZE.small, color: MUTED, font: bold }));
+      draw(page, text('RATE', { right: COLUMNS.rate.right, y, size: SIZE.small, color: MUTED, font: bold }));
+      draw(page, text('AMOUNT', { right: COLUMNS.amount.right, y, size: SIZE.small, color: MUTED, font: bold }));
       y -= 8;
       rule(page, y, INK);
     }
@@ -311,9 +302,9 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
       const baseline = firstBaselineY(y, item.height, item.lines);
       const ys = baselines(baseline, item.lines);
       item.lines.forEach((line, i) => drawLine(page, line, ys[i], COLUMNS.description.x));
-      draw(page, at(item.quantity, { right: COLUMNS.quantity.right, y: baseline }));
-      draw(page, at(item.rate, { right: COLUMNS.rate.right, y: baseline }));
-      draw(page, at(item.amount, { right: COLUMNS.amount.right, y: baseline }));
+      draw(page, text(item.quantity, { right: COLUMNS.quantity.right, y: baseline }));
+      draw(page, text(item.rate, { right: COLUMNS.rate.right, y: baseline }));
+      draw(page, text(item.amount, { right: COLUMNS.amount.right, y: baseline }));
 
       y -= item.height;
       rule(page, y);
@@ -321,19 +312,19 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
 
     if (index === pageCount - 1) {
       y -= 18;
-      draw(page, at('Amount Due', { right: COLUMNS.rate.right, y, size: SIZE.heading, color: MUTED, font: bold }));
-      draw(page, at(formatUSD(totalCents), { right: COLUMNS.amount.right, y: y - 3, size: SIZE.total, font: bold }));
+      draw(page, text('Amount Due', { right: COLUMNS.rate.right, y, size: SIZE.heading, color: MUTED, font: bold }));
+      draw(page, text(formatUSD(totalCents), { right: COLUMNS.amount.right, y: y - 3, size: SIZE.total, font: bold }));
 
       if (noteLines.length) {
         y -= NOTES.gapAbove;
-        draw(page, at('NOTES', { x: CONTENT.left, y, size: SIZE.small, color: MUTED, font: bold }));
+        draw(page, text('NOTES', { x: CONTENT.left, y, size: SIZE.small, color: MUTED, font: bold }));
         const first = y - noteLines[0].leading;
         baselines(first, noteLines).forEach((lineY, i) => drawLine(page, noteLines[i], lineY, CONTENT.left));
       }
     }
 
     if (pageCount > 1) {
-      draw(page, at(`Page ${index + 1} of ${pageCount}`, {
+      draw(page, text(`Page ${index + 1} of ${pageCount}`, {
         right: CONTENT.right, y: CONTENT.bottom - 18, size: SIZE.small, color: MUTED,
       }));
     }
@@ -346,9 +337,9 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
     // z-order beyond call order, and a mark hidden behind an opaque box is not
     // a watermark.
     if (watermark) {
-      const text = 'DEMO';
+      const mark = 'DEMO';
       const size = 110;
-      const width = bold.widthOfTextAtSize(text, size);
+      const width = bold.widthOfTextAtSize(mark, size);
       const cap = bold.heightAtSize(size, { descender: false });
 
       // pdf-lib rotates about the text origin, which is the *start of the
@@ -358,7 +349,7 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
       // half the width back along the baseline, then half the cap height back
       // along the perpendicular.
       const along = Math.SQRT1_2;   // cos 45 = sin 45
-      page.drawText(text, {
+      page.drawText(mark, {
         x: PAGE.width / 2 - (width * along) / 2 + (cap * along) / 2,
         y: PAGE.height / 2 - (width * along) / 2 - (cap * along) / 2,
         size,

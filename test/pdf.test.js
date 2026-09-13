@@ -7,6 +7,7 @@ import { generateInvoicePdf, planPages, embedFonts } from '../src/lib/pdf/genera
 import { makeInvoice, snapshotClient, snapshotVendor, makeClient, makeVendor } from '../src/schema.js';
 import { sanitize, CONTENT, COLUMNS, META, SIZE, TOTALS_HEIGHT } from '../src/lib/pdf/layout.js';
 import { layoutBlocks } from '../src/lib/pdf/richtext.js';
+import { lowestInk } from '../src/lib/pdf/ops.js';
 import { parseMarkup } from '../src/lib/markup.js';
 import { parseCents, parseQuantity } from '../src/money.js';
 import { pdfStrings, pdfText } from './pdftext.js';
@@ -155,6 +156,31 @@ test('pagination reacts to the actual header height, not an assumed one', async 
     tall.pages[0].length < short.pages[0].length,
     `a taller header must fit fewer rows on page one (tall: ${tall.pages[0].length}, short: ${short.pages[0].length})`,
   );
+});
+
+test('a header does not draw below the line it hands the table', async () => {
+  // `endY` is the header's promise about where it stopped, and both passes act
+  // on it: the paginator to work out how many rows fit, the drawer to place
+  // the first one. Nothing held the header to it. A header that computed endY
+  // one way and drew something below it would put a row on top of an address,
+  // which is the disagreement the buildHeader split exists to prevent -- so it
+  // is worth an assertion rather than a comment.
+  const fonts = await fontsFor();
+  const brief = makeClient({
+    name: 'Acceleratti Incredibilus, LLC',
+    address: { street: '1 Desert Route 66', city: 'Kingman', state: 'AZ', zip: '86401' },
+  });
+
+  for (const [label, billTo] of [
+    ['a client with an Attn line', snapshotClient(client)],
+    ['a client without one', snapshotClient(brief)],
+  ]) {
+    const { firstHeader, contHeader } = planPages(invoiceWith([line('Anvil')], { billTo }), fonts);
+    assert.ok(lowestInk(firstHeader.ops) >= firstHeader.endY,
+      `the first-page header draws below its own endY for ${label}`);
+    assert.ok(lowestInk(contHeader.ops) >= contHeader.endY,
+      `the continuation header draws below its own endY for ${label}`);
+  }
 });
 
 test('no page is filled past the bottom margin', async () => {
