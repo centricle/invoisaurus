@@ -312,6 +312,15 @@ export function validateClient(input) {
   return errors;
 }
 
+/**
+ * The one vendor rule with two enforcement points. `validateVendor` says it
+ * to a person filling in the form; the store says it again on the write, so a
+ * caller that skipped validation cannot produce two vendors issuing the same
+ * invoice id. Same words from both, so a test written against either holds.
+ */
+export const prefixTakenError = (prefix) =>
+  `Another vendor already issues ${prefix} numbers, and two vendors sharing a prefix would issue the same invoice id.`;
+
 export function validateVendor(input, { existing = null, takenPrefixes = [] } = {}) {
   const errors = [];
   if (!String(input.name || '').trim()) errors.push('Company name is required.');
@@ -331,7 +340,7 @@ export function validateVendor(input, { existing = null, takenPrefixes = [] } = 
   } else if (!NUMBER_PREFIX.test(prefix)) {
     errors.push('Invoice prefix may use letters, digits, dot, underscore and hyphen only, up to 16 characters.');
   } else if (takenPrefixes.includes(prefix)) {
-    errors.push(`Another vendor already issues ${prefix} numbers, and two vendors sharing a prefix would issue the same invoice id.`);
+    errors.push(prefixTakenError(prefix));
   }
 
   const pad = Number(input.numberPad);

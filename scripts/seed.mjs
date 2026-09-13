@@ -15,28 +15,27 @@
  *
  * The order below is not arbitrary. `createVendor` and `createClient` derive
  * the record id themselves and ignore any id passed in, so the returned record
- * is the only place the real id exists. `allocateInvoiceNumber` persists the
- * counter increment before it returns and there is no rollback, so validation
- * has to pass first or a failed seed burns a number out of the series.
+ * is the only place the real id exists. `createInvoice` allocates the number
+ * as it writes and there is no rollback, so validation has to pass first or a
+ * failed seed burns a number out of the series.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import {
-  ensureDataDir, listVendors, listClients, listInvoices,
-  createVendor, createClient, allocateInvoiceNumber, saveInvoice,
-} from '../src/store.js';
+import { createJsonStore } from '../src/store.js';
 import { makeInvoice, withSnapshots, validateInvoice, invoiceTotals, today } from '../src/schema.js';
 import { parseQuantity, parseCents, formatUSD } from '../src/money.js';
 import { DATA_DIR } from '../src/config.js';
 // The cast lives in one place so this and the hosted demo cannot drift.
 import { VENDOR, CLIENT, LINE_ITEMS, NOTES, VENDOR_ID, CLIENT_ID } from '../src/fixtures/acme.js';
 
-function seed() {
-  ensureDataDir();
+const store = createJsonStore({ dataDir: DATA_DIR });
 
-  const existingVendor = listVendors().find((v) => v.id === VENDOR_ID);
-  const existingClient = listClients().find((c) => c.id === CLIENT_ID);
-  const hasInvoice = listInvoices().some((i) => i.vendorId === VENDOR_ID);
+async function seed() {
+  await store.ensureDataDir();
+
+  const existingVendor = (await store.listVendors()).find((v) => v.id === VENDOR_ID);
+  const existingClient = (await store.listClients()).find((c) => c.id === CLIENT_ID);
+  const hasInvoice = (await store.listInvoices()).some((i) => i.vendorId === VENDOR_ID);
 
   if (existingVendor && existingClient && hasInvoice) {
     console.log('Demo data already present, nothing to do.');
@@ -46,8 +45,8 @@ function seed() {
 
   // createVendor/createClient append unconditionally -- there is no upsert, so
   // seeding twice without these guards yields acme-corporation-2.
-  const vendor = existingVendor || createVendor(VENDOR);
-  const client = existingClient || createClient(CLIENT);
+  const vendor = existingVendor || await store.createVendor(VENDOR);
+  const client = existingClient || await store.createClient(CLIENT);
 
   const draft = makeInvoice({
     vendorId: vendor.id,
@@ -70,14 +69,11 @@ function seed() {
     process.exit(1);
   }
 
-  const { number, id } = allocateInvoiceNumber(vendor.id);
-  // `create: true` for the same reason the create route uses it: the number was
-  // just allocated, so nothing should exist at that id, and if something does
-  // the right answer is to stop rather than to rename over an invoice.
-  const invoice = saveInvoice(withSnapshots(
-    { ...draft, id, number },
-    { vendor, client, force: true },
-  ), { create: true });
+  // createInvoice allocates the number and refuses to write over an existing
+  // id, for the same reason the create route relies on it: the number was just
+  // allocated, so nothing should exist at that id, and if something does the
+  // right answer is to stop rather than to rename over an invoice.
+  const invoice = await store.createInvoice(withSnapshots(draft, { vendor, client, force: true }));
 
   console.log(`Vendor   ${vendor.name} (${vendor.id})`);
   console.log(`Client   ${client.name} (${client.id})`);
@@ -86,15 +82,15 @@ function seed() {
   console.log('Remove it all again with: npm run seed -- --remove');
 }
 
-function remove() {
+async function remove() {
   if (!fs.existsSync(DATA_DIR)) {
     console.log('Nothing to remove; no data directory at ' + DATA_DIR);
     return;
   }
 
-  const vendors = listVendors();
-  const clients = listClients();
-  const invoices = listInvoices();
+  const vendors = await store.listVendors();
+  const clients = await store.listClients();
+  const invoices = await store.listInvoices();
 
   // Refuse rather than guess. This deletes data files, so it only runs when
   // the directory holds the demo records and nothing else.
@@ -115,11 +111,11 @@ function remove() {
   }
   fs.rmSync(path.join(DATA_DIR, 'vendors.json'), { force: true });
   fs.rmSync(path.join(DATA_DIR, 'clients.json'), { force: true });
-  ensureDataDir(); // leaves empty registries, and any git repo here, intact
+  await store.ensureDataDir(); // leaves empty registries, and any git repo here, intact
 
   console.log(`Removed ${vendors.length} vendor(s), ${clients.length} client(s), ${invoices.length} invoice(s).`);
   console.log(`Data dir: ${DATA_DIR}`);
 }
 
-if (process.argv.includes('--remove')) remove();
-else seed();
+if (process.argv.includes('--remove')) await remove();
+else await seed();

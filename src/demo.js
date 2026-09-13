@@ -7,26 +7,23 @@
  * gets their own in-memory storage backend, seeded with the ACME cast, held in
  * a Map keyed by a cookie and thrown away on a timer.
  *
- * **Nothing is threaded through the routes.** The backend is carried in an
- * `AsyncLocalStorage`, which the storage layer reads, so every route, every
- * validator and every store function is the same code the local tool runs.
- * Passing a session down through seven handlers would mean the demo and the
- * product no longer share a call path, which is the point at which a demo
- * starts being able to disagree with the thing it is demonstrating.
+ * **The routes do not know.** A visitor's store is attached to the request as
+ * `req.store`, which is where every handler reads its store from in every
+ * mode, so every route, every validator and every store rule is the same code
+ * the local tool runs. A demo-specific branch inside the handlers would mean
+ * the demo and the product no longer share a call path, which is the point at
+ * which a demo starts being able to disagree with the thing it is
+ * demonstrating.
  *
  * The state is deliberately not durable. A Lambda container recycles and the
  * session is gone; the banner says as much, and `reset` does it on purpose.
  * Persisting it would mean a real write surface that strangers can fill, which
  * is the thing this whole design exists to avoid.
  */
-import { AsyncLocalStorage } from 'node:async_hooks';
 import crypto from 'node:crypto';
 import { DEMO_MODE, BASE_PATH } from './config.js';
-import { fsBackend, useBackendResolver } from './storage.js';
 import { createMemoryBackend } from './storage-memory.js';
-import {
-  ensureDataDir, createVendor, createClient, allocateInvoiceNumber, saveInvoice,
-} from './store.js';
+import { createJsonStore } from './store.js';
 import { makeInvoice, withSnapshots, today, addDays } from './schema.js';
 import { parseQuantity, parseCents } from './money.js';
 import { VENDOR, CLIENT, DEMO_CLIENTS, DEMO_INVOICES } from './fixtures/acme.js';
@@ -49,29 +46,29 @@ const TTL_MS = 2 * 60 * 60 * 1000;
  */
 const MAX_SESSIONS = 500;
 
-const store = new Map(); // sid -> { backend, lastSeen }
-const als = new AsyncLocalStorage();
+const sessions = new Map(); // sid -> { store, lastSeen }
+
+/**
+ * The directory a visitor's store believes it lives in. Never created: the
+ * memory backend keys records by path string and touches no filesystem, so
+ * this only has to be some absolute path, the same for every visitor.
+ */
+const DEMO_DIR = '/invoisaurus-demo';
 
 export const isDemoMode = () => DEMO_MODE;
 
-/** Install the resolver once, at startup. Off in a normal install. */
-export function installDemoBackend() {
-  if (!DEMO_MODE) return;
-  useBackendResolver(() => als.getStore()?.backend ?? fsBackend);
-}
-
 function sweep(now) {
-  for (const [sid, session] of store) {
-    if (now - session.lastSeen > TTL_MS) store.delete(sid);
+  for (const [sid, session] of sessions) {
+    if (now - session.lastSeen > TTL_MS) sessions.delete(sid);
   }
   // Map iterates in insertion order and `touch` re-inserts, so the oldest
   // entry is the least recently seen one.
-  while (store.size > MAX_SESSIONS) store.delete(store.keys().next().value);
+  while (sessions.size > MAX_SESSIONS) sessions.delete(sessions.keys().next().value);
 }
 
 function touch(sid, session) {
-  store.delete(sid);
-  store.set(sid, { ...session, lastSeen: Date.now() });
+  sessions.delete(sid);
+  sessions.set(sid, { ...session, lastSeen: Date.now() });
 }
 
 /**
@@ -84,27 +81,23 @@ function touch(sid, session) {
  * hand-built fixture is how a demo ends up containing records the app itself
  * could not have produced.
  */
-function seed() {
-  const backend = createMemoryBackend();
+async function seed() {
+  const store = createJsonStore({ backend: createMemoryBackend(), dataDir: DEMO_DIR });
 
-  als.run({ backend }, () => {
-    ensureDataDir();
-    const vendor = createVendor(VENDOR);
-    const clients = new Map();
-    for (const record of [CLIENT, ...DEMO_CLIENTS]) {
-      const created = createClient(record);
-      clients.set(created.id, created);
-    }
+  await store.ensureDataDir();
+  const vendor = await store.createVendor(VENDOR);
+  const clients = new Map();
+  for (const record of [CLIENT, ...DEMO_CLIENTS]) {
+    const created = await store.createClient(record);
+    clients.set(created.id, created);
+  }
 
-    for (const spec of DEMO_INVOICES) {
-      const client = clients.get(spec.client);
-      if (!client) continue;
+  for (const spec of DEMO_INVOICES) {
+    const client = clients.get(spec.client);
+    if (!client) continue;
 
-      const issueDate = addDays(today(), -spec.issuedDaysAgo);
-      const { number, id } = allocateInvoiceNumber(vendor.id);
-      const draft = makeInvoice({
-        id,
-        number,
+    const issueDate = addDays(today(), -spec.issuedDaysAgo);
+    const draft = makeInvoice({
         vendorId: vendor.id,
         clientId: client.id,
         issueDate,
@@ -118,13 +111,12 @@ function seed() {
         })),
       });
 
-      // `force` because these are being created at their final status, so
-      // there is no prior snapshot the freeze policy could preserve.
-      saveInvoice(withSnapshots(draft, { vendor, client, force: true }), { create: true });
-    }
-  });
+    // `force` because these are being created at their final status, so
+    // there is no prior snapshot the freeze policy could preserve.
+    await store.createInvoice(withSnapshots(draft, { vendor, client, force: true }));
+  }
 
-  return backend;
+  return store;
 }
 
 /**
@@ -135,20 +127,20 @@ function seed() {
  * so, because work disappearing with no explanation is the one thing that
  * would read as the app being broken rather than the demo being a demo.
  */
-export function demoSession(req, res, next) {
+export async function demoSession(req, res, next) {
   if (!DEMO_MODE) return next();
 
   const now = Date.now();
   sweep(now);
 
   const sid = readCookie(req, COOKIE);
-  const existing = sid ? store.get(sid) : undefined;
+  const existing = sid ? sessions.get(sid) : undefined;
 
   // A cookie naming a session we no longer hold is the reset case, and it is
   // distinguishable from a first visit only by the cookie being there at all.
   const reset = Boolean(sid) && !existing;
   const id = existing ? sid : crypto.randomUUID();
-  const session = existing || { backend: seed(), lastSeen: now };
+  const session = existing || { store: await seed(), lastSeen: now };
 
   touch(id, session);
 
@@ -158,13 +150,14 @@ export function demoSession(req, res, next) {
   res.locals.demoMode = true;
   res.locals.demoReset = reset;
 
-  return als.run({ backend: store.get(id).backend }, next);
+  req.store = sessions.get(id).store;
+  return next();
 }
 
 /** Throw this visitor's records away and start them over. */
 export function resetSession(req, res) {
   const sid = readCookie(req, COOKIE);
-  if (sid) store.delete(sid);
+  if (sid) sessions.delete(sid);
   res.clearCookie(COOKIE, { path: COOKIE_PATH });
 }
 
@@ -175,4 +168,4 @@ function readCookie(req, name) {
 }
 
 /** Test seam: how many visitors are currently held. */
-export const sessionCount = () => store.size;
+export const sessionCount = () => sessions.size;
