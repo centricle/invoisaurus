@@ -85,20 +85,47 @@ const SUBSTITUTIONS = new Map(Object.entries({
 // WinAnsi's high range beyond Latin-1: the printable characters at 0x80-0x9F.
 const WINANSI_EXTRAS = new Set('€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ');
 
+/**
+ * What one character becomes under WinAnsi: the string that stands for it, or
+ * `null` when nothing in the encoding can.
+ *
+ * Split out so `sanitize` and `unrepresentable` cannot come to different
+ * conclusions. One of them drops a character and the other is the validator
+ * that promises it will never have to; a second copy of this decision tree
+ * would eventually let a character through one and not the other.
+ */
+function fold(char) {
+  if (SUBSTITUTIONS.has(char)) return SUBSTITUTIONS.get(char);
+  if (char === '\n' || char === '\t') return char;
+  const code = char.codePointAt(0);
+  // 0x7F and the C1 block 0x80-0x9F sit inside this range but have no
+  // WinAnsi encoding, and pdf-lib throws rather than substituting -- one
+  // U+0085 pasted from an RTF export turned the whole PDF route into a 500.
+  // The printable glyphs that live at 0x80-0x9F in WinAnsi are reached by
+  // their real code points through WINANSI_EXTRAS above.
+  if (code >= 0x20 && code <= 0xFF && !(code >= 0x7F && code <= 0x9F)) return char;
+  if (WINANSI_EXTRAS.has(char)) return char;
+  return null;
+}
+
 export function sanitize(text) {
   let out = '';
+  // Unrepresentable characters are dropped rather than drawn as a wrong glyph.
+  for (const char of String(text ?? '')) out += fold(char) ?? '';
+  return out;
+}
+
+/**
+ * The characters in `text` that `sanitize` would drop, each named once.
+ *
+ * The soft hyphen and its kind are deliberately not in here. They fold to an
+ * empty string, which is a decision about what they mean rather than a failure
+ * to represent them -- hence the test against `null` and not against falsiness.
+ */
+export function unrepresentable(text) {
+  const out = [];
   for (const char of String(text ?? '')) {
-    if (SUBSTITUTIONS.has(char)) { out += SUBSTITUTIONS.get(char); continue; }
-    const code = char.codePointAt(0);
-    if (char === '\n' || char === '\t') { out += char; continue; }
-    // 0x7F and the C1 block 0x80-0x9F sit inside this range but have no
-    // WinAnsi encoding, and pdf-lib throws rather than substituting -- one
-    // U+0085 pasted from an RTF export turned the whole PDF route into a 500.
-    // The printable glyphs that live at 0x80-0x9F in WinAnsi are reached by
-    // their real code points through WINANSI_EXTRAS below.
-    if (code >= 0x20 && code <= 0xFF && !(code >= 0x7F && code <= 0x9F)) { out += char; continue; }
-    if (WINANSI_EXTRAS.has(char)) { out += char; continue; }
-    // Unrepresentable. Drop it rather than drawing a wrong glyph.
+    if (fold(char) === null && !out.includes(char)) out.push(char);
   }
   return out;
 }

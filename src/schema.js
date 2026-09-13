@@ -7,6 +7,7 @@
  * values that a query could not recompute.
  */
 import { lineAmountCents, sumCents, formatUSD, MAX_CENTS } from './money.js';
+import { unrepresentable } from './lib/pdf/layout.js';
 
 export const SCHEMA_VERSION = 2;
 
@@ -269,9 +270,44 @@ export function uniqueId(base, takenIds) {
  * takes it as an argument rather than from the form. There is no path by which
  * a caller can propose one, so there is nothing here to reject.
  */
+/**
+ * A name the invoice PDF has no way to draw.
+ *
+ * The code point rides along because the character is often the problem: a
+ * zero-width space renders as nothing at all, and "cannot use  " helps nobody.
+ *
+ * Only the fields that identify someone are checked. A name is what says which
+ * legal entity this is, and one printed a character short is a
+ * misidentification rather than a cosmetic loss -- whereas a description
+ * pasted out of a word processor has a paragraph of context around whatever
+ * sanitize folds, and rejecting the paste would be worse than folding it.
+ *
+ * This does not make sanitize unnecessary. billTo and remitFrom are snapshots
+ * taken before this rule existed, and every record already on disk can still
+ * hold one of these, so sanitize remains what keeps the PDF route from
+ * becoming a 500.
+ */
+function winansiError(label, value) {
+  const bad = unrepresentable(value);
+  if (!bad.length) return null;
+  const named = bad
+    .map((c) => `${c} (U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')})`)
+    .join(', ');
+  return `${label} cannot use ${named} — the invoice PDF would print the `
+    + `${label.toLowerCase()} without ${bad.length > 1 ? 'those characters' : 'that character'}.`;
+}
+
 export function validateClient(input) {
   const errors = [];
   if (!String(input.name || '').trim()) errors.push('Legal name is required — it renders on the invoice.');
+  for (const [label, value] of [
+    ['Legal name', input.name],
+    ['Display name', input.displayName],
+    ['Primary contact', input.contactName],
+  ]) {
+    const error = winansiError(label, value);
+    if (error) errors.push(error);
+  }
   if (!CLIENT_TYPES.includes(input.type)) errors.push('Type must be Business or Individual.');
   return errors;
 }
@@ -279,6 +315,8 @@ export function validateClient(input) {
 export function validateVendor(input, { existing = null, takenPrefixes = [] } = {}) {
   const errors = [];
   if (!String(input.name || '').trim()) errors.push('Company name is required.');
+  const nameError = winansiError('Company name', input.name);
+  if (nameError) errors.push(nameError);
 
   // The prefix is the leading half of every invoice id, and an invoice id is a
   // filename and a URL segment. Two constraints follow. It must be filename
