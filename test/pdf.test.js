@@ -5,7 +5,7 @@ import './tmpdir.js';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { generateInvoicePdf, planPages, embedFonts } from '../src/lib/pdf/generate.js';
 import { makeInvoice, snapshotClient, snapshotVendor, makeClient, makeVendor } from '../src/schema.js';
-import { sanitize, CONTENT, COLUMNS, META, SIZE, TOTALS_HEIGHT } from '../src/lib/pdf/layout.js';
+import { sanitize, CONTENT, COLUMNS, META, SIZE } from '../src/lib/pdf/layout.js';
 import { layoutBlocks } from '../src/lib/pdf/richtext.js';
 import { lowestInk } from '../src/lib/pdf/ops.js';
 import { parseMarkup } from '../src/lib/markup.js';
@@ -501,15 +501,15 @@ test('the totals and the notes are both reserved for on the last page', async ()
 
   for (const count of [10, 18, 20, 21, 22, 23, 24, 26]) {
     const items = Array.from({ length: count }, (_, i) => line(`Item ${i + 1}`));
-    const { pages, firstHeader, contHeader, capacityOf, notesHeight } = planPages(
+    const { pages, firstHeader, contHeader, capacityOf, notesHeight, totalsHeight } = planPages(
       invoiceWith(items, { notes }), fonts,
     );
     const last = pages.length - 1;
     const used = pages[last].reduce((sum, r) => sum + r.height, 0);
     const available = capacityOf(last === 0 ? firstHeader : contHeader);
     assert.ok(
-      used + TOTALS_HEIGHT + notesHeight <= available,
-      `${count} items: the last page needs ${Math.round(used + TOTALS_HEIGHT + notesHeight)} of ${Math.round(available)}`,
+      used + totalsHeight + notesHeight <= available,
+      `${count} items: the last page needs ${Math.round(used + totalsHeight + notesHeight)} of ${Math.round(available)}`,
     );
   }
 });
