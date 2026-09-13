@@ -8,14 +8,14 @@ and generates the PDF you send to the client. No account, no network, no
 database. The server binds loopback only, so an editor with no login on it does
 not appear on whatever network the machine has joined.
 
-![The invoice editor: line items, live totals and a notes field](docs/editor.png)
+![The invoice editor: line items, live totals and a notes field](docs/editor.webp)
 
 Line-item arithmetic happens in the browser as you type. Everything else is a
 form POST. The preview below the editor is not a second rendering of the same
 data — it is an iframe pointed at the real PDF route, so what you see is the
 file the client gets.
 
-![The generated PDF: ACME Corporation billing Wile E. Coyote $695.00](docs/invoice-pdf.png)
+![The generated PDF in the Classic style: ACME Corporation billing Wile E. Coyote $695.00](docs/invoice-pdf.webp)
 
 ## Quick start
 
@@ -197,6 +197,8 @@ above the preview. **Classic** is Helvetica throughout, hairline rules, no fills
 dates and every figure in IBM Plex Mono, with a summary panel carrying the amount
 due and the date it is due. Both use the same page box and the same columns, so
 one reads against the other line for line.
+
+![The same invoice in the Modern style: a summary panel carrying the amount due, and every figure set in IBM Plex Mono](docs/invoice-modern.webp)
 
 A vendor carries the style its new invoices start in; changing it leaves invoices
 already issued alone. The style freezes when an invoice leaves draft, alongside
