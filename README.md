@@ -302,7 +302,7 @@ every pull request, against the Node version pinned in `.nvmrc`.
 | `src/lib/pdf/` | `layout.js` holds the geometry, `richtext.js` turns blocks into lines, `generate.js` draws them |
 | `src/routes/` | One router each for invoices, clients, vendors |
 | `src/views/` | EJS templates |
-| `public/js/` | Browser-side behavior: the invoice editor, and the number steppers on the vendor and invoice forms |
+| `public/js/` | Browser-side behavior: the invoice editor, the number steppers on the vendor and invoice forms, and the formatting help popover |
 | `netlify/` | The hosted demo: one function wrapping the same Express app |
 | `netlify.toml` | How that deploy is built and routed |
 
