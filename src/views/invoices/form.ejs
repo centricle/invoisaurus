@@ -39,7 +39,7 @@
 
 <%- include('../partials/errors') %>
 
-<form method="post" data-invoice-form
+<form method="post" id="invoice-form" data-invoice-form
       data-term-days='<%- JSON.stringify(termDays) %>'
       action="<%= u(isNew ? '/invoices' : `/invoices/${invoice.id}`) %>" class="space-y-8">
 
@@ -214,9 +214,21 @@
 <% if (!isNew) { %>
   <section class="mt-12">
     <div class="mb-3 flex items-center justify-between">
-      <h2 class="text-sm font-medium uppercase tracking-wide text-slate-400">Preview</h2>
-      <a href="<%= u('/invoices/' + (invoice.id) + '/pdf') %>" target="_blank"
-         class="text-xs text-slate-500 hover:text-slate-300">Open in new tab</a>
+      <%- include('../partials/style-toggle', {
+        styles: INVOICE_STYLES,
+        current: invoice.style,
+        frozen: invoice.status !== 'draft',
+        form: 'invoice-form',
+      }) %>
+      <a href="<%= u('/invoices/' + (invoice.id) + '/pdf') %>" target="_blank" rel="noopener"
+         title="Open the PDF in a new tab" aria-label="Open the PDF in a new tab"
+         class="rounded p-1.5 text-slate-500 hover:text-slate-200">
+        <svg viewBox="0 0 20 20" aria-hidden="true" class="h-4 w-4" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11.5 4H16v4.5" /><path d="M16 4l-6.5 6.5" />
+          <path d="M15 12.5v3A1.5 1.5 0 0 1 13.5 17h-9A1.5 1.5 0 0 1 3 15.5v-9A1.5 1.5 0 0 1 4.5 5h3" />
+        </svg>
+      </a>
     </div>
     <!-- The preview is the real PDF, not a second HTML rendering of the same
          data. There is nothing here that can drift from what the client gets. -->
