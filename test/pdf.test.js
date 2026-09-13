@@ -5,7 +5,7 @@ import './tmpdir.js';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { generateInvoicePdf, planPages, embedFonts } from '../src/lib/pdf/generate.js';
 import { makeInvoice, snapshotClient, snapshotVendor, makeClient, makeVendor } from '../src/schema.js';
-import { sanitize, CONTENT, META, SIZE, TOTALS_HEIGHT } from '../src/lib/pdf/layout.js';
+import { sanitize, CONTENT, COLUMNS, META, SIZE, TOTALS_HEIGHT } from '../src/lib/pdf/layout.js';
 import { layoutBlocks } from '../src/lib/pdf/richtext.js';
 import { parseMarkup } from '../src/lib/markup.js';
 import { parseCents, parseQuantity } from '../src/money.js';
@@ -37,10 +37,8 @@ const pageCount = async (invoice) =>
 const fontsFor = async () => embedFonts(await PDFDocument.create());
 
 /** Lay text out against the description column, the way planPages does. */
-const layout = (text, fonts, maxWidth = COLUMNS_WIDTH) =>
+const layout = (text, fonts, maxWidth = COLUMNS.description.width) =>
   layoutBlocks(parseMarkup(text), fonts, { maxWidth });
-
-const COLUMNS_WIDTH = 262;
 
 /** A laid-out line as the string it draws, and the width it occupies. */
 const lineText = (line) => line.segments.map((s) => s.text).join('');
@@ -77,7 +75,7 @@ test('a description too long for its column wraps', async () => {
   const fonts = await fontsFor();
   const lines = layout('word '.repeat(60), fonts);
   assert.ok(lines.length > 1);
-  for (const l of lines) assert.ok(lineWidth(l) <= COLUMNS_WIDTH);
+  for (const l of lines) assert.ok(lineWidth(l) <= COLUMNS.description.width);
 });
 
 test('line breaks in a description survive to the page', async () => {
@@ -108,7 +106,7 @@ test('an unbroken token wider than the column is split, not overflowed', async (
   const fonts = await fontsFor();
   const url = `https://example.com/${'a'.repeat(300)}`;
   const lines = layout(url, fonts);
-  for (const l of lines) assert.ok(lineWidth(l) <= COLUMNS_WIDTH);
+  for (const l of lines) assert.ok(lineWidth(l) <= COLUMNS.description.width);
 });
 
 test('characters outside WinAnsi do not crash generation', async () => {
@@ -418,7 +416,7 @@ test('a wrapped list item hangs under its own text, not under the bullet', async
   assert.equal(lines[1].marker, undefined, 'a continuation line draws no second bullet');
   assert.equal(lines[1].indent, lines[0].indent);
   assert.ok(lines[0].indent > 0);
-  for (const l of lines) assert.ok(lineWidth(l) <= COLUMNS_WIDTH, 'the indent comes out of the column, not past it');
+  for (const l of lines) assert.ok(lineWidth(l) <= COLUMNS.description.width, 'the indent comes out of the column, not past it');
 });
 
 test('an ordered list is renumbered from where it starts', async () => {
