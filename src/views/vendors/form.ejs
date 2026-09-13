@@ -12,6 +12,19 @@
     <%- field('email', 'Email', vendor.email, { type: 'email', className: 'sm:col-span-2', hint: 'Renders on the invoice as the contact for billing questions.' }) %>
   </div>
 
+  <label class="block max-w-xs">
+    <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Invoice style</span>
+    <select name="defaultStyle"
+            class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+      <% INVOICE_STYLES.forEach((s) => { %>
+        <option value="<%= s.id %>" <%= vendor.defaultStyle === s.id ? 'selected' : '' %>><%= s.label %></option>
+      <% }) %>
+    </select>
+    <p class="mt-1 text-xs text-slate-500">
+      The style new invoices from this vendor start in. Changing it leaves invoices already issued alone.
+    </p>
+  </label>
+
   <%- include('../partials/address-fields', { address: vendor.address }) %>
 
   <fieldset class="rounded-md border border-slate-800 p-4">

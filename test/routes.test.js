@@ -127,6 +127,26 @@ test('sending an invoice freezes the details it is being sent with', async () =>
   assert.equal(saved.billTo.address.street, '9 Rimrock Way');
 });
 
+test('the editor marks the saved style as the pressed one', async () => {
+  const draft = seedInvoice();
+  await post(`/invoices/${draft.id}`, formFields(draft, { style: 'modern' }));
+
+  const body = await (await fetch(`${base}/invoices/${draft.id}`)).text();
+  assert.match(body, /name="style" value="modern"[^>]*aria-pressed="true"/s);
+  assert.match(body, /name="style" value="classic"[^>]*aria-pressed="false"/s);
+  // Submitting the editor rather than a form of its own is what keeps a style
+  // change from discarding unsaved line-item edits.
+  assert.match(body, /form="invoice-form" name="style"/);
+});
+
+test('a sent invoice shows its style without offering to change it', async () => {
+  const sent = seedInvoice({ status: 'sent' });
+  const body = await (await fetch(`${base}/invoices/${sent.id}`)).text();
+
+  assert.ok(!/name="style"/.test(body), 'no style buttons on a frozen invoice');
+  assert.match(body, /aria-label="PDF style"/, 'but the style it was sent in is still shown');
+});
+
 test('choosing a style saves it, and an ordinary save keeps it', async () => {
   // The style buttons are submit buttons, so only the one that was clicked is
   // submitted and every other save arrives with no style field at all. A

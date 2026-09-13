@@ -1,0 +1,47 @@
+<%#
+  The PDF style, as a pair of buttons above the preview.
+
+  They are submit buttons belonging to the editor form, reached by `form=`
+  rather than by nesting, because the control sits below `</form>` next to the
+  thing it changes. So choosing a style saves the invoice. That is deliberate:
+  a form of its own posting only the style would throw away every unsaved edit
+  on the page, and silently, because the unsaved-changes guard in
+  public/js/invoice-editor.js stands down for any form that is not the editor.
+  The preview renders the saved record anyway, so a style change that did not
+  save could not show the reader anything.
+
+  A form submits only the button that was clicked, so an ordinary Save sends no
+  style at all. src/routes/invoices.js falls back to the stored value rather
+  than to a default for exactly that reason.
+
+  One thing to know before moving this: implicit submission -- Enter in a text
+  field -- picks the first submit button in tree order that belongs to the
+  form. This partial is after `</form>` in the document, so Save Changes stays
+  the default. Put it above Save and Enter in the date field would quietly
+  restyle the invoice.
+
+  Frozen out of draft, like the address blocks: the client already has a PDF
+  drawn one way, and redrawing that invoice number another way turns one number
+  into two different-looking documents.
+
+  Takes `styles`, `current`, `frozen`, and `form` (the id to submit).
+%>
+<% const shell = 'inline-flex rounded-md border border-slate-800 p-0.5'; %>
+<% const cell = 'rounded px-2.5 py-1 text-xs font-medium uppercase tracking-wide'; %>
+<% const on = 'bg-slate-800 text-slate-100'; %>
+<% const off = 'text-slate-500 hover:text-slate-300'; %>
+<% if (frozen) { %>
+  <div class="<%= shell %>" role="group" aria-label="PDF style">
+    <% styles.forEach((s) => { %>
+      <span class="<%= cell %> <%= s.id === current ? on : 'text-slate-700' %>"><%= s.label %></span>
+    <% }) %>
+  </div>
+<% } else { %>
+  <div class="<%= shell %>" role="group" aria-label="PDF style">
+    <% styles.forEach((s) => { %>
+      <button type="submit" form="<%= form %>" name="style" value="<%= s.id %>"
+              aria-pressed="<%= s.id === current %>"
+              class="<%= cell %> <%= s.id === current ? on : off %>"><%= s.label %></button>
+    <% }) %>
+  </div>
+<% } %>
