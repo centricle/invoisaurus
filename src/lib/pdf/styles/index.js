@@ -9,8 +9,9 @@
  * every test that touches a record. A test asserts the two agree.
  */
 import classic from './classic.js';
+import modern from './modern.js';
 
-export const STYLES = { classic };
+export const STYLES = { classic, modern };
 
 /**
  * The drawer for a style id, falling back to classic.

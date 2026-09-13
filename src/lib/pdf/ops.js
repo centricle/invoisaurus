@@ -14,9 +14,16 @@
  * put them in the list too, or it has to draw itself, and then it is measuring
  * and drawing in the same breath again.
  */
+import { setCharacterSpacing } from 'pdf-lib';
 import { SIZE, METRICS, sanitize } from './layout.js';
 
-/** Text, left-anchored at `x` or right-anchored at `right`. */
+/**
+ * Text, left-anchored at `x` or right-anchored at `right`.
+ *
+ * `tracking` is extra space between letters, in points. There is no pdf-lib
+ * option for it -- it is a text-state operator, set outside the block pdf-lib
+ * emits and cleared after, which `render` handles.
+ */
 export const text = (string, opts) => ({ kind: 'text', string, ...opts });
 
 /** A horizontal rule at `y`, from `x` to `right`. */
@@ -39,6 +46,16 @@ export const lowestInk = (ops) => Math.min(...ops.map(bottom));
 const bottom = (op) => (op.kind === 'text'
   ? op.y - METRICS.descender * (op.size ?? SIZE.body)
   : op.y);
+
+/**
+ * How wide a string will be drawn.
+ *
+ * Tracking adds its space *after* every glyph, the last one included, so the
+ * advance is one gap wider than the ink. Right alignment wants the ink, or a
+ * tracked label sits a point or two left of the column it is labelling.
+ */
+const widthOf = (string, face, size, tracking = 0) =>
+  face.widthOfTextAtSize(string, size) + tracking * Math.max(0, string.length - 1);
 
 /**
  * Paint one operation.
@@ -73,6 +90,13 @@ export function render(page, op, { font, ink }) {
   const string = sanitize(op.string);
   const size = op.size ?? SIZE.body;
   const face = op.font ?? font;
-  const x = op.right != null ? op.right - face.widthOfTextAtSize(string, size) : op.x;
-  return page.drawText(string, { x, y: op.y, size, font: face, color: op.color ?? ink });
+  const x = op.right != null ? op.right - widthOf(string, face, size, op.tracking) : op.x;
+
+  // Character spacing is text state, so it is inherited by the graphics state
+  // pdf-lib pushes around its own text block, and it outlives that block's
+  // pop. Hence the reset: without it every later string on the page is tracked
+  // too.
+  if (op.tracking) page.pushOperators(setCharacterSpacing(op.tracking));
+  page.drawText(string, { x, y: op.y, size, font: face, color: op.color ?? ink });
+  if (op.tracking) page.pushOperators(setCharacterSpacing(0));
 }

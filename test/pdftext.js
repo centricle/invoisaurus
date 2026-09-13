@@ -11,6 +11,14 @@
  * rather than as readable text, so both have to be undone: inflate every stream
  * in the file, then decode each `<hex> Tj` operand. Strings are returned in
  * draw order, which is also reading order for this document.
+ *
+ * It reads Standard-14 text only. pdf-lib writes an embedded font as
+ * Type0/Identity-H, so a string set in one comes back as glyph indices rather
+ * than characters -- it does not throw and it does not come back empty, which
+ * makes `!pdfText(bytes).includes(...)` pass against it whatever the page
+ * says. The Modern style sets its labels and every figure in an embedded face:
+ * assert those through the style's draw operations instead, the way
+ * test/styles.test.js does.
  */
 import zlib from 'node:zlib';
 
