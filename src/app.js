@@ -10,11 +10,12 @@
  * configures itself on import.
  *
  * Nothing here reads `process.env`. The one thing that does is `config.js`,
- * and only `server.js` reads that.
+ * and only `server.js` reads that. (src/paths.js reads one variable, to find
+ * this package's own files inside a bundle; that is about where the code is,
+ * not how it is run.)
  */
 import express from 'express';
-import path from 'node:path';
-import { ROOT_DIR } from './config.js';
+import { VIEWS_DIR, PUBLIC_DIR } from './paths.js';
 import {
   formatUSD, formatQuantity, formatCents, quantityInputValue, centsInputValue,
 } from './money.js';
@@ -67,12 +68,12 @@ export function createApp({
   const app = express();
   app.engine('ejs', ejsEngine);
   app.set('view engine', 'ejs');
-  app.set('views', path.join(ROOT_DIR, 'src/views'));
+  app.set('views', VIEWS_DIR);
   // 100kb of form data is roughly 300 line items. The default is the same
   // number; stating it makes it a decision rather than a default, now that the
   // form is reachable by anyone.
   app.use(express.urlencoded({ extended: true, limit: '100kb' }));
-  app.use(base || '/', express.static(path.join(ROOT_DIR, 'public')));
+  app.use(base || '/', express.static(PUBLIC_DIR));
 
   // Helpers every view needs. Kept in one place so no template reimplements money
   // or invoice-number formatting and quietly disagrees with the PDF.
