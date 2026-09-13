@@ -32,6 +32,20 @@ async function withServer(fn) {
 
 const get = (base, url) => fetch(base + url, { redirect: 'manual' });
 
+/** Load one page for its CSRF cookie, then post the way its form would. */
+async function post(base, url, fields) {
+  const page = await get(base, `${PREFIX}/invoices`);
+  const set = page.headers.getSetCookie().find((c) => c.startsWith('csrf='));
+  const token = set.split(';')[0].slice(5);
+  const res = await fetch(base + url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: `csrf=${token}` },
+    body: new URLSearchParams({ ...fields, _csrf: token }),
+    redirect: 'manual',
+  });
+  return { res, csrfCookie: set };
+}
+
 test('a trailing slash is normalized away', () => {
   // `/etc/invoisaurus/` + `/invoices` would be `//invoices`, which a browser
   // reads as a protocol-relative URL to the host "invoices" -- an off-site
@@ -111,14 +125,9 @@ test('no page emits a link that escapes the prefix', async () => {
 
 test('redirects out of handlers carry the prefix', async () => {
   await withServer(async (base) => {
-    const res = await fetch(`${base}${PREFIX}/clients`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        name: 'Marvin the Martian', type: 'individual',
-        street: '1 Illudium Way', city: 'Mars', state: 'NM', zip: '87500',
-      }),
-      redirect: 'manual',
+    const { res } = await post(base, `${PREFIX}/clients`, {
+      name: 'Marvin the Martian', type: 'individual',
+      street: '1 Illudium Way', city: 'Mars', state: 'NM', zip: '87500',
     });
     assert.equal(res.status, 302);
     assert.equal(res.headers.get('location'), `${PREFIX}/clients/marvin-the-martian/edit`);
@@ -129,18 +138,14 @@ test('cookies are scoped to the mount, not the host', async () => {
   await withServer(async (base) => {
     // Set at '/', the parent site would receive this app's cookies, and
     // clearCookie at a mismatched path clears nothing at all.
-    const res = await fetch(`${base}${PREFIX}/clients`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        name: 'Daffy Duck', type: 'individual',
-        street: '2 Duck Pond', city: 'Tucumcari', state: 'NM', zip: '88401',
-      }),
-      redirect: 'manual',
+    const { res, csrfCookie } = await post(base, `${PREFIX}/clients`, {
+      name: 'Daffy Duck', type: 'individual',
+      street: '2 Duck Pond', city: 'Tucumcari', state: 'NM', zip: '88401',
     });
     const cookies = (res.headers.getSetCookie?.() || []).join('\n');
     assert.match(cookies, /flash=/);
     assert.match(cookies, new RegExp(`Path=${PREFIX}(;|$)`, 'm'));
+    assert.match(csrfCookie, new RegExp(`Path=${PREFIX}(;|$)`), 'the CSRF cookie is scoped the same way');
   });
 });
 

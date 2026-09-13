@@ -13,13 +13,25 @@ process.env.INVOISAURUS_DATA_DIR = DATA_DIR;
 
 const { app, guest } = await import('../server.js');
 
-/** A visitor: keeps its own cookie jar, the way a browser would. */
+/**
+ * A visitor: keeps its own cookie jar, the way a browser would, and echoes
+ * the CSRF token from it into every post, the way a rendered form would.
+ */
 function visitor(base) {
   let cookie = '';
   return async function go(url, opts = {}) {
+    const headers = { ...(opts.headers || {}), ...(cookie ? { cookie } : {}) };
+    let { body } = opts;
+    if ((opts.method || 'GET').toUpperCase() === 'POST') {
+      const token = (cookie.match(/(?:^|; )csrf=([^;]+)/) || [])[1] || '';
+      body = body instanceof URLSearchParams ? body : new URLSearchParams();
+      body.set('_csrf', token);
+      headers['content-type'] = 'application/x-www-form-urlencoded';
+    }
     const res = await fetch(base + url, {
       ...opts,
-      headers: { ...(opts.headers || {}), ...(cookie ? { cookie } : {}) },
+      headers,
+      body,
       redirect: 'manual',
     });
     const set = res.headers.getSetCookie?.() || [];

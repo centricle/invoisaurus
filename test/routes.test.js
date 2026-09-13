@@ -22,11 +22,20 @@ import { pdfText } from './pdftext.js';
 let base;
 const store = createJsonStore({ dataDir: DATA_DIR });
 
+// A browser that has loaded one page holds the CSRF cookie and can echo its
+// token back in a form. `post` below does the same, so every request here
+// is the kind a real form makes; test/csrf.test.js is where the refusals live.
+let csrf = { cookie: '', token: '' };
+
 before(async () => {
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   base = `http://127.0.0.1:${server.address().port}`;
   server.unref();
+
+  const first = await fetch(`${base}/invoices`);
+  const token = first.headers.getSetCookie().find((c) => c.startsWith('csrf=')).split(';')[0].slice(5);
+  csrf = { cookie: `csrf=${token}`, token };
 });
 
 const ACME = {
@@ -67,8 +76,8 @@ async function seedInvoice(overrides = {}) {
 
 const post = (url, fields) => fetch(`${base}${url}`, {
   method: 'POST',
-  headers: { 'content-type': 'application/x-www-form-urlencoded' },
-  body: new URLSearchParams(fields),
+  headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: csrf.cookie },
+  body: new URLSearchParams({ ...fields, _csrf: csrf.token }),
   redirect: 'manual',
 });
 

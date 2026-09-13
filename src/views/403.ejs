@@ -1,0 +1,14 @@
+<%- include('partials/layout-head', { title: 'Not saved' }) %>
+<div class="rounded-lg border border-dashed border-amber-900/60 px-6 py-16 text-center">
+  <p class="text-sm text-slate-300">
+    That form could not be verified as coming from this site, so nothing was saved.
+  </p>
+  <%# `why` is one of cross-site, origin, token. The visitor does not need the
+      taxonomy; the fix is the same for all three. %>
+  <p class="mt-2 text-xs text-slate-500">
+    Go back, reload the page and try again. This happens when a page was left
+    open for a long time, or was submitted from somewhere other than this site.
+  </p>
+  <a href="<%= u('/') %>" class="mt-4 inline-block text-sm text-sky-400 hover:underline">Back to invoices</a>
+</div>
+<%- include('partials/layout-foot') %>
