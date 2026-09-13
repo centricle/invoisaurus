@@ -6,122 +6,42 @@
  * invoice is an ordinary invoice, not an edge case, and retrofitting page
  * breaks into a single-pass drawer means rewriting it.
  *
- * The header is *built* rather than drawn directly — `buildHeader` returns a
- * list of draw operations plus the y coordinate where the table can start. Both
- * the paginator and the drawer read that same result, so the space reserved for
- * the header and the space it actually occupies cannot disagree. They did
- * disagree while the header height was a constant: a client with a second
+ * What is drawn is a style's business; where it lands is this file's. A style
+ * (src/lib/pdf/styles/) returns lists of draw operations and, with each one,
+ * the y coordinate it stopped at. Both passes read those same results, so the
+ * space reserved for a block and the space it occupies cannot disagree. They
+ * did disagree while the header height was a constant: a client with a second
  * address line pushed rows below the bottom margin, and a short one left a
  * third of the page blank.
+ *
+ * Nothing here knows what an invoice looks like. Everything here knows what
+ * happens when one does not fit on a page.
  */
-import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
-import {
-  PAGE, CONTENT, SIZE, LEADING, COLUMNS, TOTALS_HEIGHT, META, LIST_GAP,
-} from './layout.js';
-import { text, rule as ruleOp, render } from './ops.js';
+import { PDFDocument, rgb, degrees } from 'pdf-lib';
+import { PAGE, CONTENT, LIST_GAP } from './layout.js';
+import { render } from './ops.js';
+import { styleFor } from './styles/index.js';
 import {
   layoutBlocks, rowHeight, blockHeight, firstBaselineY, linesThatFit, baselines,
 } from './richtext.js';
 import { parseMarkup, parsePlain } from '../markup.js';
 import { formatUSD, formatQuantity, lineAmountCents } from '../../money.js';
-import { addressLines, termById, formatLongDate, MARKUP_SCHEMA_VERSION } from '../../schema.js';
-
-const INK = rgb(0.08, 0.09, 0.11);
-const MUTED = rgb(0.42, 0.45, 0.5);
-const RULE = rgb(0.80, 0.82, 0.85);
-
-/** Space reserved below the page header for the table's column headings.
- *  The drawer uses 8 of it before the rule; the rest is slack. */
-const TABLE_HEADER = 18;
-
-/**
- * The notes block: the gap from the totals down to its label, and from the
- * label down to the first line of text.
- *
- * One constant read by both passes. They disagreed before -- the reserve was
- * 24 and the drawer spent 44 -- which left the measure pass twenty points
- * optimistic about a block it was supposed to be protecting from the margin.
- */
-const NOTES = { gapAbove: 44, gapBelow: 0 };
-
-/**
- * Build the first-page header.
- *
- * Returns the operations to draw and `endY`, the baseline below which the
- * line-item table may begin.
- */
-function buildHeader(invoice, { bold }) {
-  const vendor = invoice.remitFrom || {};
-  const client = invoice.billTo || {};
-  const ops = [];
-
-  const titleY = CONTENT.top - SIZE.title;
-  ops.push(text(vendor.name || '', { x: CONTENT.left, y: titleY, size: SIZE.title, font: bold }));
-  ops.push(text('INVOICE', { right: CONTENT.right, y: titleY, size: SIZE.title, color: MUTED, font: bold }));
-
-  // Remit-from block, left column.
-  let leftY = titleY - 20;
-  for (const line of addressLines(vendor.address)) {
-    ops.push(text(line, { x: CONTENT.left, y: leftY, color: MUTED }));
-    leftY -= LEADING.tight;
-  }
-  if (vendor.email) {
-    ops.push(text(vendor.email, { x: CONTENT.left, y: leftY, color: MUTED }));
-    leftY -= LEADING.tight;
-  }
-
-  // Invoice metadata, right column.
-  let metaY = titleY - 22;
-  for (const [label, value] of [
-    ['Invoice', invoice.id],
-    ['Date', formatLongDate(invoice.issueDate)],
-    ['Terms', termById(invoice.terms).label],
-    ['Payment Due', formatLongDate(invoice.dueDate)],
-  ]) {
-    ops.push(text(label, { right: META.labelRight, y: metaY, color: MUTED }));
-    ops.push(text(String(value), { right: CONTENT.right, y: metaY, font: bold }));
-    metaY -= LEADING.body;
-  }
-
-  // Bill To sits below whichever column ran longer.
-  let billY = Math.min(leftY, metaY) - 24;
-  ops.push(text('BILL TO', { x: CONTENT.left, y: billY, size: SIZE.small, color: MUTED, font: bold }));
-  billY -= LEADING.body + 2;
-  ops.push(text(client.name || '', { x: CONTENT.left, y: billY, font: bold }));
-  billY -= LEADING.tight;
-  if (client.contactName) {
-    ops.push(text(`Attn: ${client.contactName}`, { x: CONTENT.left, y: billY }));
-    billY -= LEADING.tight;
-  }
-  for (const line of addressLines(client.address)) {
-    ops.push(text(line, { x: CONTENT.left, y: billY }));
-    billY -= LEADING.tight;
-  }
-
-  return { ops, endY: billY - 22 };
-}
-
-/** Continuation pages carry only the invoice number. */
-function buildContinuationHeader(invoice, { bold }) {
-  const y = CONTENT.top - 12;
-  return {
-    ops: [text(`${invoice.id} (continued)`, { x: CONTENT.left, y, size: SIZE.heading, font: bold })],
-    endY: CONTENT.top - 40,
-  };
-}
+import { MARKUP_SCHEMA_VERSION } from '../../schema.js';
 
 /**
  * The measure pass, exported so pagination can be asserted directly.
  *
- * Returns the rows assigned to each page alongside the header layouts they were
+ * Returns the rows assigned to each page alongside the block layouts they were
  * measured against. A test that counts rows per page is the only thing that
  * catches the header/paginator disagreement described above, because the
  * failure is silent: the PDF still renders, just with rows below the margin.
+ *
+ * `styleId` defaults rather than being required. Every caller that predates a
+ * second style -- and every test that measures pagination -- means classic.
  */
-export function planPages(invoice, fonts) {
-  const { bold } = fonts;
-  const firstHeader = buildHeader(invoice, { bold });
-  const contHeader = buildContinuationHeader(invoice, { bold });
+export function planPages(invoice, fonts, styleId = 'classic') {
+  const style = styleFor(styleId);
+  const { tableHeader, totalsHeight, notesGapAbove, notesGapBelow } = style.metrics;
 
   // Which parser runs is the whole of the version gate. A record written
   // before the formatting subset existed goes through parsePlain, so an
@@ -129,10 +49,10 @@ export function planPages(invoice, fonts) {
   // an invoice is a record of what was sent, and that applies to what its
   // characters meant as much as to the address they went to.
   const parse = (invoice.schemaVersion ?? 1) >= MARKUP_SCHEMA_VERSION ? parseMarkup : parsePlain;
-  const lay = (text, maxWidth) => layoutBlocks(parse(text), fonts, { maxWidth });
+  const lay = (source, maxWidth) => layoutBlocks(parse(source), fonts, { maxWidth });
 
   const items = invoice.lineItems.map((li) => {
-    const lines = lay(li.description, COLUMNS.description.width);
+    const lines = lay(li.description, style.columns.description.width);
     const amountCents = lineAmountCents(li.quantityMilli, li.rateCents);
     return {
       lines,
@@ -144,12 +64,20 @@ export function planPages(invoice, fonts) {
     };
   });
 
+  // Before the headers, not after: a style may print the amount due in its
+  // masthead, and a second path computing the same money on the same document
+  // is a disagreement waiting for a rounding change.
+  const totalCents = items.reduce((sum, item) => sum + item.amountCents, 0);
+
+  const firstHeader = style.header(invoice, fonts, { totalCents });
+  const contHeader = style.continuationHeader(invoice, fonts);
+
   const noteLines = invoice.notes?.trim() ? lay(invoice.notes, CONTENT.width) : [];
   const notesHeight = noteLines.length
-    ? NOTES.gapAbove + blockHeight(noteLines) + NOTES.gapBelow
+    ? notesGapAbove + blockHeight(noteLines) + notesGapBelow
     : 0;
 
-  const capacityOf = (header) => header.endY - TABLE_HEADER - CONTENT.bottom;
+  const capacityOf = (header) => header.endY - tableHeader - CONTENT.bottom;
 
   const pages = [];
   let current = [];
@@ -205,45 +133,39 @@ export function planPages(invoice, fonts) {
   // The totals block must never run past the bottom margin. If what is left
   // on the last page cannot hold it, start another page and put it there --
   // accepting a page carrying only totals and notes as the cheaper problem.
-  if (remaining < TOTALS_HEIGHT + notesHeight) pages.push([]);
+  if (remaining < totalsHeight + notesHeight) pages.push([]);
 
   return {
-    pages, firstHeader, contHeader, noteLines, notesHeight,
-    totalCents: items.reduce((sum, item) => sum + item.amountCents, 0),
-    capacityOf,
+    pages, firstHeader, contHeader, noteLines, notesHeight, totalsHeight,
+    totalCents, capacityOf, style,
   };
 }
 
 /**
- * The four faces the drawer needs.
+ * The faces a style's drawer needs.
  *
- * All four are Standard 14, so the obliques cost the document nothing: no font
- * file, no fontkit, no embedded bytes. They exist so a description can carry an
- * italic phrase. Exported because `planPages` takes them, and a test that
- * measures pagination has to embed the same four.
+ * Exported because `planPages` takes them, and a test that measures pagination
+ * has to embed the same ones the drawer will use.
  */
-export const embedFonts = async (doc) => ({
-  regular: await doc.embedFont(StandardFonts.Helvetica),
-  bold: await doc.embedFont(StandardFonts.HelveticaBold),
-  italic: await doc.embedFont(StandardFonts.HelveticaOblique),
-  boldItalic: await doc.embedFont(StandardFonts.HelveticaBoldOblique),
-});
+export const embedFonts = (doc, styleId = 'classic') => styleFor(styleId).embedFonts(doc);
 
 export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
+  const style = styleFor(invoice.style);
   const doc = await PDFDocument.create();
-  const fonts = await embedFonts(doc);
+  const fonts = await style.embedFonts(doc);
   const { regular: font, bold } = fonts;
+  const ink = style.ink;
 
-  const draw = (page, op) => render(page, op, { font, ink: INK });
+  const draw = (page, op) => render(page, op, { font, ink });
 
   /**
    * Draw one laid-out line: its marker to the left of the indent, then its
    * segments left to right, each advancing x by its own measured width.
    *
-   * Separate from `draw` rather than folded into it. Everything else on the
-   * page -- the header, the metadata column, the table headings, the numbers --
-   * is one string anchored left or right, and rewriting those to go through a
-   * segment list would buy nothing.
+   * Separate from `draw`, and not a style's business. Everything a style draws
+   * is one string anchored left or right; this is the one place a single line
+   * is several runs in several faces, and it is drawn identically whatever the
+   * style around it looks like.
    */
   const drawLine = (page, line, y, left) => {
     if (line.marker) {
@@ -253,23 +175,20 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
         y,
         size: line.marker.size,
         font: line.marker.font,
-        color: INK,
+        color: ink,
       });
     }
 
     let x = left + line.indent;
     for (const segment of line.segments) {
-      page.drawText(segment.text, { x, y, size: segment.size, font: segment.font, color: INK });
+      page.drawText(segment.text, { x, y, size: segment.size, font: segment.font, color: ink });
       x += segment.font.widthOfTextAtSize(segment.text, segment.size);
     }
   };
 
-  const rule = (page, y, color = RULE) =>
-    draw(page, ruleOp({ x: CONTENT.left, right: CONTENT.right, y, color }));
-
   // --- Pass one: measure and paginate ---------------------------------------
 
-  const { pages, firstHeader, contHeader, noteLines, totalCents } = planPages(invoice, fonts);
+  const { pages, firstHeader, contHeader, noteLines, totalCents } = planPages(invoice, fonts, style.id);
 
   // --- Pass two: draw --------------------------------------------------------
 
@@ -287,12 +206,9 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
     // table label nothing, so the table head is drawn only when there is a
     // table under it.
     if (rows.length) {
-      draw(page, text('DESCRIPTION', { x: COLUMNS.description.x, y, size: SIZE.small, color: MUTED, font: bold }));
-      draw(page, text('QTY', { right: COLUMNS.quantity.right, y, size: SIZE.small, color: MUTED, font: bold }));
-      draw(page, text('RATE', { right: COLUMNS.rate.right, y, size: SIZE.small, color: MUTED, font: bold }));
-      draw(page, text('AMOUNT', { right: COLUMNS.amount.right, y, size: SIZE.small, color: MUTED, font: bold }));
-      y -= 8;
-      rule(page, y, INK);
+      const head = style.tableHead(fonts, y);
+      for (const op of head.ops) draw(page, op);
+      y = head.endY;
     }
 
     // Each row is a box from `y` down to `y - height`, with its text centered
@@ -301,38 +217,31 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
     for (const item of rows) {
       const baseline = firstBaselineY(y, item.height, item.lines);
       const ys = baselines(baseline, item.lines);
-      item.lines.forEach((line, i) => drawLine(page, line, ys[i], COLUMNS.description.x));
-      draw(page, text(item.quantity, { right: COLUMNS.quantity.right, y: baseline }));
-      draw(page, text(item.rate, { right: COLUMNS.rate.right, y: baseline }));
-      draw(page, text(item.amount, { right: COLUMNS.amount.right, y: baseline }));
+      item.lines.forEach((line, i) => drawLine(page, line, ys[i], style.columns.description.x));
 
       y -= item.height;
-      rule(page, y);
+      for (const op of style.row(item, fonts, { baseline, bottom: y })) draw(page, op);
     }
 
     if (index === pageCount - 1) {
-      y -= 18;
-      draw(page, text('Amount Due', { right: COLUMNS.rate.right, y, size: SIZE.heading, color: MUTED, font: bold }));
-      draw(page, text(formatUSD(totalCents), { right: COLUMNS.amount.right, y: y - 3, size: SIZE.total, font: bold }));
+      const totals = style.totals({ totalCents }, fonts, y);
+      for (const op of totals.ops) draw(page, op);
+      y = totals.endY;
 
       if (noteLines.length) {
-        y -= NOTES.gapAbove;
-        draw(page, text('NOTES', { x: CONTENT.left, y, size: SIZE.small, color: MUTED, font: bold }));
-        const first = y - noteLines[0].leading;
+        const notes = style.notes(fonts, y);
+        for (const op of notes.ops) draw(page, op);
+        const first = notes.endY - noteLines[0].leading;
         baselines(first, noteLines).forEach((lineY, i) => drawLine(page, noteLines[i], lineY, CONTENT.left));
       }
     }
 
-    if (pageCount > 1) {
-      draw(page, text(`Page ${index + 1} of ${pageCount}`, {
-        right: CONTENT.right, y: CONTENT.bottom - 18, size: SIZE.small, color: MUTED,
-      }));
-    }
+    for (const op of style.pageFooter({ index, pageCount }, fonts)) draw(page, op);
 
     // Last, and only in the draw pass. `planPages` must never see this: the
     // measure and draw passes disagreeing about how much space something takes
-    // is the exact bug the buildHeader split above exists to prevent, and a
-    // watermark that reserved layout space would push rows off the page.
+    // is the exact bug the builders above exist to prevent, and a watermark
+    // that reserved layout space would push rows off the page.
     // Drawn over the content rather than under it because pdf-lib has no
     // z-order beyond call order, and a mark hidden behind an opaque box is not
     // a watermark.
