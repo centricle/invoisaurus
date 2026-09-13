@@ -41,6 +41,20 @@ if (!zips.length) {
   process.exit(1);
 }
 
+/**
+ * Files the app reads at runtime that the tracer cannot see.
+ *
+ * The list above catches something that should not be in a bundle. It cannot
+ * catch something that should be and is not, and that failure is every bit as
+ * quiet: the build goes green, every HTML page works, and the one route that
+ * reads the missing file throws on the first request for it.
+ */
+const REQUIRED = [
+  { pattern: /^src\/views\/invoices\/form\.ejs$/, what: 'the invoice editor template' },
+  { pattern: /^src\/lib\/pdf\/fonts\/IBMPlexMono-Regular\.ttf$/, what: "the Modern style's mono regular face" },
+  { pattern: /^src\/lib\/pdf\/fonts\/IBMPlexMono-Medium\.ttf$/, what: "the Modern style's mono medium face" },
+];
+
 let bad = 0;
 for (const zip of zips) {
   const listing = execFileSync('unzip', ['-Z1', path.join(DIR, zip)], { encoding: 'utf8' })
@@ -55,11 +69,19 @@ for (const zip of zips) {
       if (hits.length > 5) console.error(`  ...and ${hits.length - 5} more`);
     }
   }
+  for (const { pattern, what } of REQUIRED) {
+    if (listing.some((entry) => pattern.test(entry))) continue;
+    bad += 1;
+    console.error(`\n${zip} is missing ${what} (${pattern.source}).`);
+  }
+
   console.log(`${zip}: ${listing.length} entries`);
 }
 
 if (bad) {
-  console.error(`\nRefusing to ship. Exclude these in netlify.toml [functions] included_files.`);
+  console.error('\nRefusing to ship. netlify.toml [functions] included_files is where\n'
+    + 'both directions are fixed: a `!` glob to keep something out, a plain one\n'
+    + 'to force something in that the tracer cannot see.');
   process.exit(1);
 }
 console.log('No private files in any bundle.');
