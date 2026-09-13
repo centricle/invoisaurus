@@ -6,6 +6,7 @@ import {
   dueDateFor, addDays, formatInvoiceNumber, makeVendor, makeClient, makeInvoice, validateVendor,
   snapshotClient, invoiceTotals, validateInvoice, addressLines, isOverdue, daysOverdue,
   formatLongDate, validateClient, termById,
+  INVOICE_STYLES, DEFAULT_STYLE,
 } from '../src/schema.js';
 import { parseCents, parseQuantity, lineAmountCents, MAX_CENTS } from '../src/money.js';
 
@@ -213,4 +214,27 @@ test('an unrecognized terms value falls back rather than erroring', () => {
   assert.equal(dueDateFor('2026-09-02', 'nonsense'), '2026-09-02');
   assert.equal(dueDateFor('2026-09-02', 'net15'), '2026-09-17');
   assert.equal(dueDateFor('2026-09-02', 'net60'), '2026-11-01');
+});
+
+test('an invoice records a style, and an unknown one reads as the default', () => {
+  // A record written before styles existed carries none, and a hand-edited one
+  // can say anything. Both have to resolve to something drawable: the PDF
+  // route is how someone gets paid, and it is the wrong place to be strict.
+  assert.equal(makeInvoice({}).style, DEFAULT_STYLE);
+  assert.equal(makeInvoice({ style: 'modern' }).style, 'modern');
+  assert.equal(makeInvoice({ style: 'wingdings' }).style, DEFAULT_STYLE);
+  assert.equal(DEFAULT_STYLE, 'classic', 'the fallback is what every past invoice was sent in');
+});
+
+test('a vendor carries the style its new invoices start in', () => {
+  assert.equal(makeVendor({ name: 'ACME' }).defaultStyle, DEFAULT_STYLE);
+  assert.equal(makeVendor({ name: 'ACME', defaultStyle: 'modern' }).defaultStyle, 'modern');
+  assert.equal(makeVendor({ name: 'ACME', defaultStyle: '' }).defaultStyle, DEFAULT_STYLE);
+});
+
+test('every style offered has an id and a label', () => {
+  for (const style of INVOICE_STYLES) {
+    assert.ok(style.id && typeof style.id === 'string');
+    assert.ok(style.label && typeof style.label === 'string');
+  }
 });

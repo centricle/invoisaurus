@@ -127,6 +127,45 @@ test('sending an invoice freezes the details it is being sent with', async () =>
   assert.equal(saved.billTo.address.street, '9 Rimrock Way');
 });
 
+test('choosing a style saves it, and an ordinary save keeps it', async () => {
+  // The style buttons are submit buttons, so only the one that was clicked is
+  // submitted and every other save arrives with no style field at all. A
+  // handler defaulting an absent style rather than falling back to the stored
+  // one would quietly reset a Modern invoice to Classic on the next Save.
+  const draft = seedInvoice();
+  assert.equal(draft.style, 'classic', 'a new invoice starts in the vendor default');
+
+  await post(`/invoices/${draft.id}`, formFields(draft, { style: 'modern' }));
+  assert.equal(store.getInvoice(draft.id).style, 'modern');
+
+  await post(`/invoices/${draft.id}`, formFields(draft, { notes: 'Thanks.' }));
+  const saved = store.getInvoice(draft.id);
+  assert.equal(saved.style, 'modern', 'a save that submits no style leaves it alone');
+  assert.equal(saved.notes, 'Thanks.', 'and still saves what it did submit');
+});
+
+test('a sent invoice keeps the style it was sent in', async () => {
+  // Same reasoning as the snapshots: the client already has a PDF drawn one
+  // way, and redrawing that invoice number another way makes one number into
+  // two different-looking documents.
+  const sent = seedInvoice({ status: 'sent' });
+  await post(`/invoices/${sent.id}`, formFields(sent, { style: 'modern' }));
+
+  assert.equal(store.getInvoice(sent.id).style, 'classic');
+});
+
+test('a vendor default decides the style a new invoice starts in', async () => {
+  store.updateVendor(vendor.id, { ...ACME, defaultStyle: 'modern' });
+  try {
+    const res = await post('/invoices', formFields(seedInvoice()));
+    assert.equal(res.status, 302);
+    const created = res.headers.get('location').split('/').pop();
+    assert.equal(store.getInvoice(created).style, 'modern');
+  } finally {
+    store.updateVendor(vendor.id, { ...ACME, defaultStyle: 'classic' });
+  }
+});
+
 test('a sent invoice stops following the registry on the next save', async () => {
   const sent = seedInvoice({ status: 'sent' });
   await post(`/invoices/${sent.id}`, formFields(sent, { notes: 'Thanks.' }));

@@ -5,7 +5,7 @@ import {
 } from '../store.js';
 import {
   makeInvoice, validateInvoice, invoiceTotals,
-  dueDateFor, today, TERMS, INVOICE_STATUSES, withSnapshots, isOverdue, INVOICE_ID,
+  dueDateFor, today, TERMS, INVOICE_STATUSES, INVOICE_STYLES, withSnapshots, isOverdue, INVOICE_ID,
 } from '../schema.js';
 import { parseCents, parseQuantity } from '../money.js';
 import { generateInvoicePdf } from '../lib/pdf/generate.js';
@@ -68,6 +68,11 @@ const invoiceFromForm = (body) => ({
   terms: body.terms || 'net30',
   dueDate: body.dueDate || dueDateFor(body.issueDate || today(), body.terms || 'net30'),
   status: body.status || 'draft',
+  // Absent on an ordinary save. The style buttons are submit buttons, and a
+  // form submits only the one that was clicked, so every other save arrives
+  // with no style at all -- which is why both callers below fall back to the
+  // stored value rather than to a default.
+  style: body.style || '',
   notes: text(body.notes),
   lineItems: lineItemsFromForm(body),
 });
@@ -80,6 +85,7 @@ const renderContext = (invoice, errors = []) => ({
   vendors: listVendors(),
   TERMS,
   INVOICE_STATUSES,
+  INVOICE_STYLES,
   errors,
 });
 
@@ -147,7 +153,11 @@ invoicesRouter.get('/new', (req, res) => {
 });
 
 invoicesRouter.post('/', (req, res) => {
-  const input = makeInvoice(invoiceFromForm(req.body));
+  const form = invoiceFromForm(req.body);
+  const input = makeInvoice({
+    ...form,
+    style: form.style || getVendor(form.vendorId)?.defaultStyle,
+  });
   const errors = validateInvoice(input, {
     vendor: getVendor(input.vendorId), client: getClient(input.clientId),
   });
@@ -216,6 +226,10 @@ invoicesRouter.post('/:id', (req, res) => {
     ...invoiceFromForm(req.body),
     vendorId: existing.vendorId,
     clientId: existing.status === 'draft' ? (req.body.clientId || existing.clientId) : existing.clientId,
+    // The style is frozen out of draft for the same reason the snapshots are:
+    // the invoice the client already has was drawn one way, and re-rendering
+    // it another way makes one invoice number into two different documents.
+    style: existing.status === 'draft' ? (req.body.style || existing.style) : existing.style,
     id: existing.id,
     number: existing.number,
     createdAt: existing.createdAt,
