@@ -26,9 +26,11 @@
 [functions]
   node_bundler = "nft"
   # The EJS templates are read at runtime by fs.readFileSync in
-  # src/viewEngine.js, so nothing in the import graph mentions them and the
-  # tracer leaves them behind. The deploy then builds green and 500s on the
-  # first page it is asked for.
+  # src/viewEngine.js, and the Modern style's font files by src/lib/pdf/fonts.js,
+  # so nothing in the import graph mentions either and the tracer leaves them
+  # behind. The deploy then builds green and 500s on the first page it is asked
+  # for -- or, for the fonts, on the first Modern PDF, which is worse, because
+  # every other page still works.
   #
   # The exclusion is the important half. src/config.js contains
   # `path.join(ROOT, 'data')` as the default data directory, and the tracer
@@ -39,7 +41,7 @@
   # being clean says anything about what ships in the artifact.
   #
   # Verify rather than trust: `npm run check:bundle`.
-  included_files = ["src/views/**", "!data/**", "!tmp/**", "!docs/**"]
+  included_files = ["src/views/**", "src/lib/pdf/fonts/**", "!data/**", "!tmp/**", "!docs/**"]
 
 # Everything the CDN did not already answer from dist/. Not forced, so a real
 # file always wins -- that is what keeps CSS and JS off the function.
