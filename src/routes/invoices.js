@@ -6,7 +6,6 @@ import {
 import { parseCents, parseQuantity } from '../money.js';
 import { generateInvoicePdf } from '../lib/pdf/generate.js';
 import { setFlash } from '../flash.js';
-import { DEMO_MODE } from '../config.js';
 
 export const invoicesRouter = express.Router();
 
@@ -185,10 +184,11 @@ invoicesRouter.get('/:id/pdf', async (req, res, next) => {
   const invoice = await req.store.getInvoice(req.params.id);
   if (!invoice) return res.status(404).render('404', { what: 'Invoice' });
   try {
-    // Really generated from this visitor's own records, watermarked rather
-    // than withheld. A canned PDF would contradict the form they just filled
-    // in, and the document is the half of this tool worth showing.
-    const bytes = await generateInvoicePdf(invoice, { watermark: DEMO_MODE });
+    // A guest's PDF is really generated from their own records, watermarked
+    // rather than withheld. A canned PDF would contradict the form they just
+    // filled in, and the document is the half of this tool worth showing.
+    // Whoever attached the store decides; see `watermark` in src/demo.js.
+    const bytes = await generateInvoicePdf(invoice, { watermark: Boolean(res.locals.watermark) });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',

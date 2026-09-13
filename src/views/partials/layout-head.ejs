@@ -8,29 +8,32 @@
   <link rel="stylesheet" href="<%= u('/css/dist/app.css') %>">
 </head>
 <body class="h-full bg-slate-950 text-slate-200 antialiased">
-  <% if (locals.demoMode) { %>
-    <%
-      // Two different messages. A first visit is being told the rules; a
-      // reset is being told where their work went, which is the one that
-      // would otherwise read as the app losing data.
-    %>
+  <%
+    // The chrome has slots, not modes. Whatever attached the request's store
+    // fills them -- the demo says "this is a demo", a host says who is signed
+    // in -- and the layout renders what it is given. A partial cannot be
+    // overridden by whoever includes it, so this is the only way a host gets
+    // its own words up here without a copy of the file.
+    //   banner:   { strong, text, action: { href, label } }   action posts, app-relative
+    //   badge:    text beside the wordmark
+    //   navRight: [{ href, label, method }]                 method 'post' renders a button
+    //   footer:   { text, mono, link: { href, label }, tail }
+  %>
+  <% if (locals.banner) { %>
     <div class="border-b border-amber-900/60 bg-amber-950/40 text-amber-300">
       <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-2.5 text-sm">
         <p>
-          <% if (locals.demoReset) { %>
-            <strong class="font-medium">Your demo session expired.</strong>
-            The sample data is back; anything you added is gone.
-          <% } else { %>
-            <strong class="font-medium">This is a demo.</strong>
-            Create and edit anything you like. Nothing is saved, and it all disappears when your session ends.
-          <% } %>
+          <% if (banner.strong) { %><strong class="font-medium"><%= banner.strong %></strong><% } %>
+          <%= banner.text %>
         </p>
-        <form method="post" action="<%= u('/demo/reset') %>">
-          <button type="submit"
-                  class="rounded border border-amber-800/70 px-2 py-1 text-xs text-amber-200 hover:bg-amber-900/40">
-            Reset demo
-          </button>
-        </form>
+        <% if (banner.action) { %>
+          <form method="post" action="<%= u(banner.action.href) %>">
+            <button type="submit"
+                    class="rounded border border-amber-800/70 px-2 py-1 text-xs text-amber-200 hover:bg-amber-900/40">
+              <%= banner.action.label %>
+            </button>
+          </form>
+        <% } %>
       </div>
     </div>
   <% } %>
@@ -45,11 +48,11 @@
           <rect x="4" y="18" width="16" height="4" rx="1" /><rect x="4" y="6" width="16" height="4" rx="1" />
         </svg>
         Invoisaurus
-        <% if (locals.demoMode) { %>
-          <span class="rounded bg-amber-900/60 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-amber-300">Demo</span>
+        <% if (locals.badge) { %>
+          <span class="rounded bg-amber-900/60 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-amber-300"><%= badge %></span>
         <% } %>
       </a>
-      <nav class="flex gap-5 text-sm">
+      <nav class="flex items-center gap-5 text-sm">
         <%
           const section = (locals.currentPath || '/').split('/')[1] || 'invoices';
           const navItems = [['invoices', 'Invoices'], ['clients', 'Clients'], ['vendors', 'Vendors']];
@@ -58,6 +61,15 @@
           <a href="<%= u('/' + (href)) %>"
              class="<%= section === href ? 'text-slate-100 font-medium' : 'text-slate-400 hover:text-slate-100' %>"
              <%- section === href ? 'aria-current="page"' : '' %>><%= label %></a>
+        <% }) %>
+        <% (locals.navRight || []).forEach((item) => { %>
+          <% if (item.method === 'post') { %>
+            <form method="post" action="<%= u(item.href) %>">
+              <button type="submit" class="text-slate-400 hover:text-slate-100"><%= item.label %></button>
+            </form>
+          <% } else { %>
+            <a href="<%= u(item.href) %>" class="text-slate-400 hover:text-slate-100"><%= item.label %></a>
+          <% } %>
         <% }) %>
       </nav>
     </div>

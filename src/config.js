@@ -56,6 +56,3 @@ export const DEMO_MODE = process.env.DEMO_MODE === 'true';
  */
 const rawBasePath = process.env.BASE_PATH || '';
 export const BASE_PATH = rawBasePath.replace(/\/+$/, '');
-
-/** Prefix an app-absolute path. The one place a URL is built. */
-export const u = (p = '/') => `${BASE_PATH}${p}`;
