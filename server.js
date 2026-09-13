@@ -1,23 +1,23 @@
-import express from 'express';
-import path from 'node:path';
+/**
+ * The entry point for the local tool and the hosted demo.
+ *
+ * Reads the environment (through src/config.js), decides which of the two it
+ * is, and builds the app from `createApp`. Nothing below is a route; the
+ * routes live in src/app.js and do not know how they were configured.
+ */
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { PORT, ROOT_DIR, DATA_DIR, DEMO_MODE, BASE_PATH, u } from './src/config.js';
+import { PORT, DATA_DIR, DEMO_MODE, BASE_PATH } from './src/config.js';
+import { createApp } from './src/app.js';
 import { createJsonStore } from './src/store.js';
-import {
-  formatUSD, formatQuantity, formatCents, quantityInputValue, centsInputValue,
-} from './src/money.js';
-import {
-  clientLabel, addressLines, termById, dueDateFor, isOverdue, daysOverdue,
-  formatInvoiceNumber,
-} from './src/schema.js';
-import { field, statusBadgeClass } from './src/viewHelpers.js';
-import { ejsEngine } from './src/viewEngine.js';
-import { takeFlash } from './src/flash.js';
-import { demoSession, resetSession } from './src/demo.js';
-import { clientsRouter } from './src/routes/clients.js';
-import { vendorsRouter } from './src/routes/vendors.js';
-import { invoicesRouter } from './src/routes/invoices.js';
+import { createGuestSessions } from './src/demo.js';
+import { seedDemoStore } from './src/seed.js';
+
+// The data dir is rendered in the page footer, so show it home-relative rather
+// than as an absolute path that carries a username into every screenshot.
+const displayDataDir = DATA_DIR.startsWith(os.homedir())
+  ? DATA_DIR.replace(os.homedir(), '~')
+  : DATA_DIR;
 
 // The one store a local install has, over the one data directory. In demo mode
 // every visitor gets their own in-memory store, created when they arrive, so
@@ -37,99 +37,28 @@ if (store) {
   });
 }
 
-// The data dir is rendered in the page footer, so show it home-relative rather
-// than as an absolute path that carries a username into every screenshot.
-const displayDataDir = DATA_DIR.startsWith(os.homedir())
-  ? DATA_DIR.replace(os.homedir(), '~')
-  : DATA_DIR;
+/** Demo only. Exported for the tests, which count visitors. */
+export const guest = DEMO_MODE
+  ? createGuestSessions({ cookiePath: BASE_PATH || '/', seed: seedDemoStore })
+  : null;
 
-export const app = express();
-app.engine('ejs', ejsEngine);
-app.set('view engine', 'ejs');
-app.set('views', path.join(ROOT_DIR, 'src/views'));
-// 100kb of form data is roughly 300 line items. The default is the same
-// number; stating it makes it a decision rather than a default, now that the
-// form is reachable by anyone.
-app.use(express.urlencoded({ extended: true, limit: '100kb' }));
-app.use(BASE_PATH || '/', express.static(path.join(ROOT_DIR, 'public')));
-
-// After static, before anything that reads or writes records: every request
-// carries the store its handlers read from. In demo mode that is the
-// visitor's own; otherwise it is the one above. Sitting below express.static
-// keeps CSS and JS from minting a demo session apiece.
-app.use(demoSession);
-app.use((req, res, next) => {
-  req.store ??= store;
-  next();
-});
-
-// Helpers every view needs. Kept in one place so no template reimplements money
-// or invoice-number formatting and quietly disagrees with the PDF.
-Object.assign(app.locals, {
-  formatUSD, formatQuantity, formatCents, quantityInputValue, centsInputValue,
-  clientLabel, addressLines, termById, dueDateFor, formatInvoiceNumber,
-  isOverdue, daysOverdue, field, statusBadgeClass, dataDir: displayDataDir,
-  // Every link and form action in a template goes through this. A bare
-  // href="/invoices" is correct locally and off-site under the demo's prefix.
-  u, demoMode: DEMO_MODE,
-});
-
-// A confirmation belongs to one moment, so it is read and cleared here rather
-// than left in the URL where a refresh or a bookmark would show it again.
-// See src/flash.js. `currentPath` rides along because nav highlighting is the
-// same kind of thing: per-request state a template needs and cannot derive.
-app.use((req, res, next) => {
-  // The prefix is mounting detail, not part of the page's identity: the nav
-  // highlights on the first segment, which would otherwise read "etc".
-  res.locals.currentPath = BASE_PATH && req.path.startsWith(BASE_PATH)
-    ? req.path.slice(BASE_PATH.length) || '/'
-    : req.path;
-  res.locals.flash = takeFlash(req, res);
-
-  // Redirects are prefixed here rather than at each of the eight call sites.
-  // A handler saying `res.redirect('/invoices')` means the invoice list, and
-  // it should not have to know where the app happens to be mounted -- one
-  // missed call site would send a visitor to the parent site's 404.
-  const redirect = res.redirect.bind(res);
-  res.redirect = (...args) => {
-    const url = args.pop();
-    return redirect(...args, typeof url === 'string' && url.startsWith('/') ? u(url) : url);
-  };
-
-  next();
-});
-
-app.get(u('/'), (req, res) => res.redirect('/invoices'));
-
-// Mounted under a prefix, the bare origin belongs to nobody: this app never
-// registered it, so it would 404. Anyone landing there typed the host or
-// followed an old link, so send them to the front door. Registered only when
-// there is a prefix, because without one this route is the line above.
-// `'/'`, not `u('/')`: res.redirect is wrapped above to prefix app-relative
-// paths, so prefixing here too produces /etc/invoisaurus/etc/invoisaurus/.
-if (BASE_PATH) app.get('/', (req, res) => res.redirect('/'));
-
-// Demo only: throw this visitor's records away and start over. A POST because
-// it destroys data, so a crawler or a prefetch cannot trigger it.
-app.post(u('/demo/reset'), (req, res) => {
-  if (!DEMO_MODE) return res.status(404).render('404', { what: 'Page' });
-  resetSession(req, res);
-  return res.redirect('/invoices');
-});
-
-app.use(u('/invoices'), invoicesRouter);
-app.use(u('/clients'), clientsRouter);
-app.use(u('/vendors'), vendorsRouter);
-
-app.use((req, res) => res.status(404).render('404', { what: 'Page' }));
-
-// Rendering 404.ejs here produced "Something broke: <error> not found.", since
-// that template appends "not found" to whatever it is handed. The error also
-// carried an absolute path straight onto the page. Both are why this has a
-// template of its own.
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).render('500');
+export const app = createApp({
+  basePath: BASE_PATH,
+  store,
+  middleware: guest ? [guest.middleware] : [],
+  locals: {
+    footer: store ? { text: displayDataDir, mono: true } : null,
+  },
+  mount(app, { u }) {
+    // Demo only: throw this visitor's records away and start over. A POST
+    // because it destroys data, so a crawler or a prefetch cannot trigger it.
+    if (guest) {
+      app.post(u('/demo/reset'), (req, res) => {
+        guest.reset(req, res);
+        res.redirect('/invoices');
+      });
+    }
+  },
 });
 
 // Bind a port only when this file is the entry point. Importing it -- which the
