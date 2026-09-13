@@ -1,21 +1,10 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 /**
- * Where the app's own files live: templates, and public/ when it is served
- * from here.
- *
- * `import.meta.url` is the natural answer and the right one for every way this
- * app is normally run. It does not survive being bundled, though: a serverless
- * bundler transpiles the module to CommonJS and replaces `import.meta` with an
- * empty object, so `fileURLToPath(undefined)` throws while the module is still
- * being imported -- before any request, with a stack that points here rather
- * than at the bundler. Hence the override, checked first so the failing call
- * is never reached when it is set.
+ * What the entry point reads from the environment. Nothing under src/ other
+ * than server.js's imports should need this module; the app is built from
+ * arguments (src/app.js) and finds its own files through src/paths.js.
  */
-const ROOT = process.env.INVOISAURUS_ROOT
-  ? path.resolve(process.env.INVOISAURUS_ROOT)
-  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+import path from 'node:path';
+import { PKG_ROOT } from './paths.js';
 
 /**
  * The data directory is deliberately outside this repository's tracked tree.
@@ -24,10 +13,10 @@ const ROOT = process.env.INVOISAURUS_ROOT
  * here; where it actually lives and how it is backed up is up to whoever runs
  * the app.
  */
-export const DATA_DIR = path.resolve(process.env.INVOISAURUS_DATA_DIR || path.join(ROOT, 'data'));
+export const DATA_DIR = path.resolve(process.env.INVOISAURUS_DATA_DIR || path.join(PKG_ROOT, 'data'));
 
 export const PORT = Number(process.env.PORT || 7054);
-export const ROOT_DIR = ROOT;
+export const ROOT_DIR = PKG_ROOT;
 
 /**
  * Demo mode: every visitor gets a private, in-memory set of records and
