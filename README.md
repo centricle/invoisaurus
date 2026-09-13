@@ -189,6 +189,29 @@ never alters a past invoice, because an invoice is a record of what was sent.
 **Invoice numbers are per-vendor.** The number is the issuing entity's book.
 Each vendor carries its own prefix, padding and counter.
 
+### Two styles
+
+Every invoice is drawn in one of two styles, chosen per invoice from the buttons
+above the preview. **Classic** is Helvetica throughout, hairline rules, no fills.
+**Modern** keeps Helvetica for anything read in sentences and sets the labels,
+dates and every figure in IBM Plex Mono, with a summary panel carrying the amount
+due and the date it is due. Both use the same page box and the same columns, so
+one reads against the other line for line.
+
+A vendor carries the style its new invoices start in; changing it leaves invoices
+already issued alone. The style freezes when an invoice leaves draft, alongside
+the address blocks and for the same reason: the client already has a PDF drawn one
+way, and redrawing that invoice number another way turns one number into two
+different-looking documents.
+
+Modern embeds two faces of IBM Plex Mono, which live in `src/lib/pdf/fonts/` under
+the SIL Open Font License 1.1 (`OFL.txt` sits beside them). They are shipped
+exactly as IBM released them rather than subset down: pdf-lib subsets again at
+embed time, so the document a client receives is within about a hundred bytes
+either way, and subsetting here would drop the license notice out of the file and
+leave a derived binary that cannot be regenerated without a Python toolchain.
+A Modern invoice runs roughly 9 KB larger than a Classic one.
+
 ### Formatting
 
 A line-item description and the notes block accept a small formatting subset.
@@ -299,7 +322,9 @@ every pull request, against the Node version pinned in `.nvmrc`.
 | `src/fixtures/acme.js` | The ACME cast, shared by the seeder and the demo |
 | `src/money.js` | Integer-cent arithmetic and formatting |
 | `src/lib/markup.js` | The formatting subset, text to blocks. Knows nothing about PDFs |
-| `src/lib/pdf/` | `layout.js` holds the geometry, `richtext.js` turns blocks into lines, `generate.js` draws them |
+| `src/lib/pdf/` | `layout.js` holds the geometry, `richtext.js` turns blocks into lines, `generate.js` paginates and paints |
+| `src/lib/pdf/styles/` | One module per invoice style. What a page looks like, as lists of draw operations |
+| `src/lib/pdf/fonts/` | IBM Plex Mono, embedded by the Modern style, under the OFL |
 | `src/routes/` | One router each for invoices, clients, vendors |
 | `src/views/` | EJS templates |
 | `public/js/` | Browser-side behavior: the invoice editor, the number steppers on the vendor and invoice forms, and the formatting help popover |
@@ -308,9 +333,12 @@ every pull request, against the Node version pinned in `.nvmrc`.
 
 Express 5, EJS, Tailwind 4 via the CLI, pdf-lib. Line-item arithmetic is vanilla
 JS in the browser; everything else is a form POST. No bundler, no client
-framework, four runtime dependencies. The fourth, `serverless-http`, is used
-only by the hosted demo.
+framework, five runtime dependencies. `@pdf-lib/fontkit` is what lets the Modern
+style embed a font file, and `serverless-http` is used only by the hosted demo.
 
 ## License
 
 [MIT](./LICENSE)
+
+IBM Plex Mono, in `src/lib/pdf/fonts/`, is licensed separately under the
+[SIL Open Font License 1.1](./src/lib/pdf/fonts/OFL.txt) and is shipped unmodified.
