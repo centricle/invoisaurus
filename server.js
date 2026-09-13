@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { PORT, ROOT_DIR, DATA_DIR, DEMO_MODE, BASE_PATH, u } from './src/config.js';
-import { ensureDataDir } from './src/store.js';
+import { createJsonStore } from './src/store.js';
 import {
   formatUSD, formatQuantity, formatCents, quantityInputValue, centsInputValue,
 } from './src/money.js';
@@ -14,16 +14,28 @@ import {
 import { field, statusBadgeClass } from './src/viewHelpers.js';
 import { ejsEngine } from './src/viewEngine.js';
 import { takeFlash } from './src/flash.js';
-import { demoSession, installDemoBackend, resetSession } from './src/demo.js';
+import { demoSession, resetSession } from './src/demo.js';
 import { clientsRouter } from './src/routes/clients.js';
 import { vendorsRouter } from './src/routes/vendors.js';
 import { invoicesRouter } from './src/routes/invoices.js';
 
-// In demo mode every visitor gets their own in-memory store, created when
-// they arrive, so there is no directory to make -- and the serverless
-// filesystem this runs on is read-only anyway.
-installDemoBackend();
-if (!DEMO_MODE) ensureDataDir();
+// The one store a local install has, over the one data directory. In demo mode
+// every visitor gets their own in-memory store, created when they arrive, so
+// there is no directory to make -- and the serverless filesystem this runs on
+// is read-only anyway.
+//
+// ensureDataDir is synchronous underneath and has finished by the time its
+// promise exists; the only thing left to handle is a rejection, which means
+// the directory cannot be created and there is nothing to serve. Not awaited
+// at top level, because Netlify's bundler emits CommonJS for the function and
+// rejects top-level await outright (see netlify/demo-env.js).
+const store = DEMO_MODE ? null : createJsonStore({ dataDir: DATA_DIR });
+if (store) {
+  store.ensureDataDir().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
 
 // The data dir is rendered in the page footer, so show it home-relative rather
 // than as an absolute path that carries a username into every screenshot.
@@ -41,10 +53,15 @@ app.set('views', path.join(ROOT_DIR, 'src/views'));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 app.use(BASE_PATH || '/', express.static(path.join(ROOT_DIR, 'public')));
 
-// After static, before anything that reads or writes records: binds this
-// request to the visitor's own store. A no-op outside demo mode. Sitting
-// below express.static keeps CSS and JS from minting a session apiece.
+// After static, before anything that reads or writes records: every request
+// carries the store its handlers read from. In demo mode that is the
+// visitor's own; otherwise it is the one above. Sitting below express.static
+// keeps CSS and JS from minting a demo session apiece.
 app.use(demoSession);
+app.use((req, res, next) => {
+  req.store ??= store;
+  next();
+});
 
 // Helpers every view needs. Kept in one place so no template reimplements money
 // or invoice-number formatting and quietly disagrees with the PDF.

@@ -61,5 +61,19 @@ export function createMemoryBackend() {
 
     /** Demo-only: how much this visitor has accumulated, for the session cap. */
     size: () => files.size,
+
+    /**
+     * Everything held, as `{ path: text }`, and its inverse.
+     *
+     * A visitor's records exist in exactly one Lambda container's memory. To
+     * survive a trip anywhere else -- a signup that lands on another
+     * container minutes later, a fixture snapshot, a test that wants to look
+     * -- they have to leave as plain data. Text rather than parsed objects,
+     * for the same copy-not-reference reason as above.
+     */
+    dump: () => Object.fromEntries(files),
+    load(snapshot) {
+      for (const [file, text] of Object.entries(snapshot)) files.set(file, text);
+    },
   };
 }
