@@ -28,6 +28,7 @@
         </p>
         <% if (banner.action) { %>
           <form method="post" action="<%= u(banner.action.href) %>">
+            <%- locals.csrfField?.() ?? '' %>
             <button type="submit"
                     class="rounded border border-amber-800/70 px-2 py-1 text-xs text-amber-200 hover:bg-amber-900/40">
               <%= banner.action.label %>
@@ -65,6 +66,7 @@
         <% (locals.navRight || []).forEach((item) => { %>
           <% if (item.method === 'post') { %>
             <form method="post" action="<%= u(item.href) %>">
+              <%- locals.csrfField?.() ?? '' %>
               <button type="submit" class="text-slate-400 hover:text-slate-100"><%= item.label %></button>
             </form>
           <% } else { %>

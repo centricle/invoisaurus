@@ -14,6 +14,11 @@
 #
 #   netlify env:set BASE_PATH "/some/prefix"
 #
+# When proxied that way, also name the site the browser sees, so a form post
+# from it is not refused as cross-site (see src/csrf.js):
+#
+#   netlify env:set ALLOW_ORIGINS "https://example.com"
+#
 # Not in [build.environment] below, deliberately: variables set there are
 # build-time only, and this one has to reach the function at runtime too.
 # Project environment variables reach both.

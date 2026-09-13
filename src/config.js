@@ -45,3 +45,14 @@ export const DEMO_MODE = process.env.DEMO_MODE === 'true';
  */
 const rawBasePath = process.env.BASE_PATH || '';
 export const BASE_PATH = rawBasePath.replace(/\/+$/, '');
+
+/**
+ * Origins, besides the app's own, a browser may post from. Comma-separated.
+ *
+ * Only needed when the app is proxied under another site: the origin a
+ * browser reports is then the proxy's, and a browser old enough to send
+ * `Origin` without `Sec-Fetch-Site` would otherwise be refused. See
+ * src/csrf.js. Set alongside BASE_PATH as a project environment variable.
+ */
+export const ALLOW_ORIGINS = (process.env.ALLOW_ORIGINS || '')
+  .split(',').map((s) => s.trim()).filter(Boolean);

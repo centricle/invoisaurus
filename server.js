@@ -7,7 +7,7 @@
  */
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { PORT, DATA_DIR, DEMO_MODE, BASE_PATH } from './src/config.js';
+import { PORT, DATA_DIR, DEMO_MODE, BASE_PATH, ALLOW_ORIGINS } from './src/config.js';
 import { createApp } from './src/app.js';
 import { createJsonStore } from './src/store.js';
 import { createGuestSessions } from './src/demo.js';
@@ -44,6 +44,7 @@ export const guest = DEMO_MODE
 
 export const app = createApp({
   basePath: BASE_PATH,
+  allowOrigins: ALLOW_ORIGINS,
   store,
   middleware: guest ? [guest.middleware] : [],
   locals: {

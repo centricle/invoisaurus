@@ -26,6 +26,7 @@ import {
 import { field, statusBadgeClass } from './viewHelpers.js';
 import { ejsEngine } from './viewEngine.js';
 import { takeFlash } from './flash.js';
+import { createCsrf } from './csrf.js';
 import { clientsRouter } from './routes/clients.js';
 import { vendorsRouter } from './routes/vendors.js';
 import { invoicesRouter } from './routes/invoices.js';
@@ -45,6 +46,9 @@ import { invoicesRouter } from './routes/invoices.js';
  *   `badge`, `navRight`, `footer`, `watermark` -- are filled per request.
  * @param {object} [options.locals] Extra `app.locals`: defaults for the chrome
  *   slots, or anything a host's templates need.
+ * @param {string[]} [options.allowOrigins] Origins, besides this app's own,
+ *   that a browser may post from: the site a proxy serves this app under. See
+ *   src/csrf.js for why that is needed and what else is checked.
  * @param {boolean} [options.home] Whether `GET /` redirects to the invoice
  *   list. A host with a landing page owns `/` itself and passes false.
  * @param {Function} [options.mount] `(app, { u }) => void`, called after the
@@ -58,6 +62,7 @@ export function createApp({
   store = null,
   middleware = [],
   locals = {},
+  allowOrigins = [],
   home = true,
   mount = null,
 } = {}) {
@@ -107,6 +112,11 @@ export function createApp({
     }
     return next();
   });
+
+  // Every request that changes something has to prove it came from a page this
+  // app served. After the store, so a misconfigured app fails on that first;
+  // before the routers, so no handler can forget. See src/csrf.js.
+  app.use(createCsrf({ cookiePath: base || '/', allowOrigins }).middleware);
 
   // A confirmation belongs to one moment, so it is read and cleared here rather
   // than left in the URL where a refresh or a bookmark would show it again.
