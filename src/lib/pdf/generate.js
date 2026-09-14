@@ -149,8 +149,29 @@ export function planPages(invoice, fonts, styleId = 'classic') {
  */
 export const embedFonts = (doc, styleId = 'classic') => styleFor(styleId).embedFonts(doc);
 
+/**
+ * The words stamped diagonally across every page, in the order they stack.
+ *
+ * Two sources, and they answer different questions. `DEMO` is the host's call
+ * about where the document came from, passed in per request; `VOID` is the
+ * record's own state. A voided invoice still renders -- it is a record of what
+ * was sent -- but a copy of it forwarded or found in a downloads folder must
+ * not read as a bill someone still owes. Both can apply at once, since the
+ * demo seeds a void invoice, and neither overrides the other.
+ */
+const MARKS = {
+  demo: { text: 'DEMO', color: rgb(0.85, 0.35, 0.1) },
+  void: { text: 'VOID', color: rgb(0.8, 0.1, 0.1) },
+};
+
+export const marksFor = (invoice, { watermark = false } = {}) => [
+  watermark && MARKS.demo,
+  invoice.status === 'void' && MARKS.void,
+].filter(Boolean);
+
 export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
   const style = styleFor(invoice.style);
+  const marks = marksFor(invoice, { watermark });
   const doc = await PDFDocument.create();
   const fonts = await style.embedFonts(doc);
   const { regular: font, bold } = fonts;
@@ -245,11 +266,11 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
     // Drawn over the content rather than under it because pdf-lib has no
     // z-order beyond call order, and a mark hidden behind an opaque box is not
     // a watermark.
-    if (watermark) {
-      const mark = 'DEMO';
-      const size = 110;
-      const width = bold.widthOfTextAtSize(mark, size);
-      const cap = bold.heightAtSize(size, { descender: false });
+    const size = 110;
+    const cap = bold.heightAtSize(size, { descender: false });
+    const along = Math.SQRT1_2;   // cos 45 = sin 45
+    marks.forEach((mark, i) => {
+      const width = bold.widthOfTextAtSize(mark.text, size);
 
       // pdf-lib rotates about the text origin, which is the *start of the
       // baseline*, not the middle of the glyphs. Centering the baseline's
@@ -257,19 +278,24 @@ export async function generateInvoicePdf(invoice, { watermark = false } = {}) {
       // the glyph body sits off the baseline perpendicular to it. So: walk
       // half the width back along the baseline, then half the cap height back
       // along the perpendicular.
-      const along = Math.SQRT1_2;   // cos 45 = sin 45
-      page.drawText(mark, {
-        x: PAGE.width / 2 - (width * along) / 2 + (cap * along) / 2,
-        y: PAGE.height / 2 - (width * along) / 2 - (cap * along) / 2,
+      //
+      // Two marks are the same move with the center shifted along that
+      // perpendicular, one line above the page's middle and one below, so
+      // they stack like two lines of text rather than printing on top of each
+      // other. One mark has no shift and lands dead center.
+      const shift = (i - (marks.length - 1) / 2) * -1.6 * cap;
+      page.drawText(mark.text, {
+        x: PAGE.width / 2 - (width * along) / 2 + (cap * along) / 2 - shift * along,
+        y: PAGE.height / 2 - (width * along) / 2 - (cap * along) / 2 + shift * along,
         size,
         font: bold,
-        color: rgb(0.85, 0.35, 0.1),
+        color: mark.color,
         rotate: degrees(45),
-        // Legible enough that nobody mistakes the document for a real invoice,
+        // Legible enough that nobody mistakes the document for a live invoice,
         // faint enough to read the line items through it. Both matter.
         opacity: 0.16,
       });
-    }
+    });
   });
 
   doc.setTitle(`Invoice ${invoice.id}`);
