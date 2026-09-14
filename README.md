@@ -91,6 +91,50 @@ the counter, because the counter lives on the vendor record. The guarantee holds
 within one running app: two processes writing the same data directory at once
 are not coordinated, so run one at a time.
 
+## Importing line items
+
+If the hours already live in a spreadsheet, export them as CSV and create the
+invoice from that instead of retyping each line:
+
+```sh
+npm run import -- august.csv --client wile-e-coyote --notes "Services rendered in August."
+```
+
+One CSV makes one draft invoice. The file needs a header row naming three
+columns, in any order, matched without regard to case:
+
+```csv
+description,quantity,rate
+"**Rocket skates**
+Fitting and trajectory calibration.",3.5,150.00
+Anvil delivery,2,$85
+```
+
+`qty` works in place of `quantity`, and any other columns are ignored. A
+description can span lines and use the [formatting](#formatting) the editor
+supports; wrap it in double quotes, and write a quote inside it as `""`.
+Quantities and rates are read by the same code as the editor's fields, so
+`$1,250.00` and `7.5` both work.
+
+| Option | Default | |
+|---|---|---|
+| `--client <id>` | none | Required. The id is in the client's edit URL |
+| `--vendor <id>` | the only vendor | Required once there is more than one |
+| `--date YYYY-MM-DD` | today | Issue date |
+| `--terms <id>` | `net30` | `on-receipt`, `net15`, `net30`, `net45`, `net60` |
+| `--notes <text>` | empty | Notes, on every invoice the command creates |
+| `--dry-run` | | Validate and print totals, write nothing |
+
+Several files can be named at once; they are numbered in the order given.
+Everything is checked before the first number is used. An invoice number is
+taken from the vendor's counter at the moment the invoice is written, and it is
+not given back if a later write fails, so importing file by file would leave a
+gap in the series behind a typo in the second file. Instead, one bad row stops
+the whole command with every problem listed, and nothing is written.
+
+Imported invoices are drafts. Open one in the app to check it, then mark it
+sent.
+
 ## Demo mode
 
 There is a second way to run this, used for the
@@ -361,6 +405,7 @@ every pull request, against the Node version pinned in `.nvmrc`.
 | `src/storage-memory.js` | The in-memory backend the demo uses |
 | `src/demo.js` | `createGuestSessions()`: a store per visitor, and the reset |
 | `src/seed.js` | Populates any store with the ACME cast, through the store's own methods |
+| `src/import.js` | CSV parsing, and line items from a CSV |
 | `src/csrf.js` | The form-post check |
 | `src/cookies.js` | Reads one cookie. Used by the flash, the demo and the check above |
 | `src/fixtures/acme.js` | The ACME cast, shared by the seeder and the demo |
@@ -434,7 +479,7 @@ keeps the fonts elsewhere passes a loader to `configureFonts` from
 from `public/css/app.css` with the Tailwind CLI, pointing `@source` at both
 sets of templates.
 
-The rest of the surface -- `invoisaurus/schema`, `/money`, `/markup`, `/pdf`,
+The rest of the surface -- `invoisaurus/schema`, `/money`, `/markup`, `/import`, `/pdf`,
 `/demo`, `/seed`, `/fixtures`, `/csrf`, `/flash`, `/cookies`, `/paths` -- is
 the same modules the local tool is made of, under the names in `package.json`.
 
