@@ -1,7 +1,4 @@
 import express from 'express';
-import {
-  listClients, getClient, createClient, updateClient, invoiceCountForClient,
-} from '../store.js';
 import { makeClient, validateClient, CLIENT_TYPES, emptyAddress } from '../schema.js';
 import { setFlash } from '../flash.js';
 
@@ -22,9 +19,13 @@ const fromForm = (body) => ({
   },
 });
 
-clientsRouter.get('/', (req, res) => {
-  const clients = listClients()
-    .map((c) => ({ ...c, invoiceCount: invoiceCountForClient(c.id) }))
+clientsRouter.get('/', async (req, res) => {
+  const { store } = req;
+  // One pass over the invoices, not one per client: the count is derived from
+  // the same list for every row.
+  const invoices = await store.listInvoices();
+  const clients = (await store.listClients())
+    .map((c) => ({ ...c, invoiceCount: invoices.filter((inv) => inv.clientId === c.id).length }))
     .sort((a, b) => (a.displayName || a.name).localeCompare(b.displayName || b.name));
   res.render('clients/index', { clients });
 });
@@ -36,7 +37,7 @@ clientsRouter.get('/new', (req, res) => {
   });
 });
 
-clientsRouter.post('/', (req, res) => {
+clientsRouter.post('/', async (req, res) => {
   const input = fromForm(req.body);
   const errors = validateClient(input);
   if (errors.length) {
@@ -44,22 +45,23 @@ clientsRouter.post('/', (req, res) => {
       client: input, isNew: true, errors, CLIENT_TYPES, invoiceCount: 0,
     });
   }
-  const client = createClient(input);
+  const client = await req.store.createClient(input);
   setFlash(res, 'client-created', client.name);
   res.redirect(`/clients/${client.id}/edit`);
 });
 
-clientsRouter.get('/:id/edit', (req, res) => {
-  const client = getClient(req.params.id);
+clientsRouter.get('/:id/edit', async (req, res) => {
+  const client = await req.store.getClient(req.params.id);
   if (!client) return res.status(404).render('404', { what: 'Client' });
   res.render('clients/form', {
     client, isNew: false, errors: [], CLIENT_TYPES,
-    invoiceCount: invoiceCountForClient(client.id),
+    invoiceCount: await req.store.invoiceCountForClient(client.id),
   });
 });
 
-clientsRouter.post('/:id', (req, res) => {
-  const existing = getClient(req.params.id);
+clientsRouter.post('/:id', async (req, res) => {
+  const { store } = req;
+  const existing = await store.getClient(req.params.id);
   if (!existing) return res.status(404).render('404', { what: 'Client' });
   // fromForm never reads an id from the request, so this can only ever be the
   // existing one. It is carried for the re-render on validation failure; the
@@ -69,10 +71,10 @@ clientsRouter.post('/:id', (req, res) => {
   if (errors.length) {
     return res.status(422).render('clients/form', {
       client: input, isNew: false, errors, CLIENT_TYPES,
-      invoiceCount: invoiceCountForClient(existing.id),
+      invoiceCount: await store.invoiceCountForClient(existing.id),
     });
   }
-  updateClient(existing.id, input);
+  await store.updateClient(existing.id, input);
   setFlash(res, 'client-saved');
   res.redirect('/clients');
 });

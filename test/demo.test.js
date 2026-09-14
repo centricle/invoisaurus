@@ -11,16 +11,27 @@ import './demomode.js';
 const DATA_DIR = path.join(os.tmpdir(), `invoisaurus-demo-never-${process.pid}`);
 process.env.INVOISAURUS_DATA_DIR = DATA_DIR;
 
-const { app } = await import('../server.js');
-const { sessionCount } = await import('../src/demo.js');
+const { app, guest } = await import('../server.js');
 
-/** A visitor: keeps its own cookie jar, the way a browser would. */
+/**
+ * A visitor: keeps its own cookie jar, the way a browser would, and echoes
+ * the CSRF token from it into every post, the way a rendered form would.
+ */
 function visitor(base) {
   let cookie = '';
   return async function go(url, opts = {}) {
+    const headers = { ...(opts.headers || {}), ...(cookie ? { cookie } : {}) };
+    let { body } = opts;
+    if ((opts.method || 'GET').toUpperCase() === 'POST') {
+      const token = (cookie.match(/(?:^|; )csrf=([^;]+)/) || [])[1] || '';
+      body = body instanceof URLSearchParams ? body : new URLSearchParams();
+      body.set('_csrf', token);
+      headers['content-type'] = 'application/x-www-form-urlencoded';
+    }
     const res = await fetch(base + url, {
       ...opts,
-      headers: { ...(opts.headers || {}), ...(cookie ? { cookie } : {}) },
+      headers,
+      body,
       redirect: 'manual',
     });
     const set = res.headers.getSetCookie?.() || [];
@@ -140,6 +151,6 @@ test('demo mode writes nothing to disk, at all', async () => {
     // path nothing has created, and after a full round of creates, saves and
     // deletes it still does not exist.
     assert.equal(fs.existsSync(DATA_DIR), false, `demo mode created ${DATA_DIR}`);
-    assert.ok(sessionCount() > 0, 'and yet the records are held in memory');
+    assert.ok(guest.count() > 0, 'and yet the records are held in memory');
   });
 });

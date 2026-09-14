@@ -12,8 +12,12 @@
  * reimplementing the invariants above for the demo, and a demo that
  * reimplements the product is a demo that eventually contradicts it.
  *
- * Six primitives, keyed by the same absolute path strings either way, so
- * `store.js` reads identically in both modes.
+ * Six primitives, keyed by absolute path strings. A store is built over one
+ * backend (`createJsonStore({ backend })`), so the choice is made once, where
+ * the store is made, and never consulted again per call. The earlier design
+ * resolved the backend on every primitive through a process-wide hook, because
+ * the store was a module singleton and a request had no other way to reach it;
+ * a store that is an object the request carries needs no hook.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -51,24 +55,3 @@ export const fsBackend = {
   remove: (file) => fs.rmSync(file, { force: true }),
   ensureDir: (dir) => fs.mkdirSync(dir, { recursive: true }),
 };
-
-/**
- * Which backend the current request is using.
- *
- * A hook rather than an import, so this module never has to know that demo
- * mode exists. `demo.js` installs a resolver that returns the calling
- * visitor's own store; with nothing installed, everything goes to disk exactly
- * as before.
- */
-let resolve = () => fsBackend;
-
-export function useBackendResolver(fn) {
-  resolve = fn;
-}
-
-export const readJson = (file, fallback) => resolve().readJson(file, fallback);
-export const writeJson = (file, value) => resolve().writeJson(file, value);
-export const exists = (file) => resolve().exists(file);
-export const listDir = (dir) => resolve().listDir(dir);
-export const remove = (file) => resolve().remove(file);
-export const ensureDir = (dir) => resolve().ensureDir(dir);
