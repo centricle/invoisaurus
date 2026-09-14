@@ -149,12 +149,30 @@ test('the editor marks the saved style as the pressed one', async () => {
   assert.match(body, /form="invoice-form" name="style"/);
 });
 
-test('a sent invoice shows its style without offering to change it', async () => {
-  const sent = await seedInvoice({ status: 'sent' });
-  const body = await (await fetch(`${base}/invoices/${sent.id}`)).text();
+test('a sent, paid or void invoice shows its style as a disabled control', async () => {
+  for (const status of ['sent', 'paid', 'void']) {
+    const frozen = await seedInvoice({ status, style: 'modern' });
+    const body = await (await fetch(`${base}/invoices/${frozen.id}`)).text();
 
-  assert.ok(!/name="style"/.test(body), 'no style buttons on a frozen invoice');
-  assert.match(body, /aria-label="PDF style"/, 'but the style it was sent in is still shown');
+    assert.ok(!/name="style"/.test(body), `${status}: nothing that could submit a style`);
+    const group = /<div[^>]*aria-label="PDF style"[^>]*>([\s\S]*?)<\/div>/.exec(body);
+    assert.ok(group, `${status}: the style it was issued in is still shown`);
+    assert.match(group[0], /cursor-not-allowed/, `${status}: not-allowed cursor on the group`);
+    assert.match(group[0], /title="The style is locked once an invoice leaves draft/, `${status}: says why`);
+
+    const buttons = group[1].match(/<button[^>]*>/g);
+    assert.equal(buttons.length, 2, status);
+    assert.ok(buttons.every((b) => /\sdisabled[\s>]/.test(b)), `${status}: every button disabled`);
+    assert.ok(buttons.every((b) => /pointer-events-none/.test(b)), `${status}: pointer reaches the group`);
+    assert.match(group[1], /aria-pressed="true"[^>]*>Modern</, `${status}: the saved style is the pressed one`);
+  }
+});
+
+test('a draft offers the style buttons with no locked tooltip', async () => {
+  const draft = await seedInvoice();
+  const body = await (await fetch(`${base}/invoices/${draft.id}`)).text();
+  assert.ok(!/cursor-not-allowed/.test(body));
+  assert.ok(!/The style is locked/.test(body));
 });
 
 test('choosing a style saves it, and an ordinary save keeps it', async () => {
