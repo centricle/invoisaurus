@@ -28,6 +28,7 @@
     "./schema": "./src/schema.js",
     "./money": "./src/money.js",
     "./markup": "./src/lib/markup.js",
+    "./import": "./src/import.js",
     "./pdf": "./src/lib/pdf/generate.js",
     "./fonts": "./src/lib/pdf/fonts.js",
     "./demo": "./src/demo.js",
