@@ -169,7 +169,16 @@ To reproduce the build the way CI runs it:
 ```sh
 npx netlify build
 npm run check:bundle
+npm run smoke:bundle
 ```
+
+`smoke:bundle` unzips the function archive and calls its handler the way Lambda
+would, for the invoice list and three PDFs. The suite runs the source, but the
+bundler rewrites it into CommonJS on the way out, and 2.0.0 shipped a demo whose
+every PDF was a 500 with the whole suite green: a default export came back as a
+module namespace once transpiled, and nowhere else. Every module under `src/`
+now uses named exports, a test refuses a default one, and this script is what
+would have caught it anyway.
 
 `check:bundle` inspects the generated function archive and fails if it contains
 anything private. That is not paranoia: the bundler traces file paths out of the
