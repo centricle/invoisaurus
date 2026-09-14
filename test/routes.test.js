@@ -5,7 +5,7 @@ import path from 'node:path';
 // Must precede any src import: it binds INVOISAURUS_DATA_DIR before config.js
 // resolves it. See test/tmpdir.js.
 import { DATA_DIR } from './tmpdir.js';
-import * as store from '../src/store.js';
+import { createJsonStore } from '../src/store.js';
 import { app } from '../server.js';
 import { pdfText } from './pdftext.js';
 
@@ -20,12 +20,22 @@ import { pdfText } from './pdftext.js';
  * disk and no free port.
  */
 let base;
+const store = createJsonStore({ dataDir: DATA_DIR });
+
+// A browser that has loaded one page holds the CSRF cookie and can echo its
+// token back in a form. `post` below does the same, so every request here
+// is the kind a real form makes; test/csrf.test.js is where the refusals live.
+let csrf = { cookie: '', token: '' };
 
 before(async () => {
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   base = `http://127.0.0.1:${server.address().port}`;
   server.unref();
+
+  const first = await fetch(`${base}/invoices`);
+  const token = first.headers.getSetCookie().find((c) => c.startsWith('csrf=')).split(';')[0].slice(5);
+  csrf = { cookie: `csrf=${token}`, token };
 });
 
 const ACME = {
@@ -41,17 +51,17 @@ const COYOTE = {
 let vendor;
 let client;
 
-beforeEach(() => {
+beforeEach(async () => {
   fs.rmSync(DATA_DIR, { recursive: true, force: true });
-  store.ensureDataDir();
-  vendor = store.createVendor(ACME);
-  client = store.createClient(COYOTE);
+  await store.ensureDataDir();
+  vendor = await store.createVendor(ACME);
+  client = await store.createClient(COYOTE);
 });
 
 /** Save an invoice straight through the store, bypassing the form. */
-function seedInvoice(overrides = {}) {
-  const { number, id } = store.allocateInvoiceNumber(vendor.id);
-  return store.saveInvoice({
+async function seedInvoice(overrides = {}) {
+  const { number, id } = await store.allocateInvoiceNumber(vendor.id);
+  return await store.saveInvoice({
     id,
     number,
     vendorId: vendor.id,
@@ -66,8 +76,8 @@ function seedInvoice(overrides = {}) {
 
 const post = (url, fields) => fetch(`${base}${url}`, {
   method: 'POST',
-  headers: { 'content-type': 'application/x-www-form-urlencoded' },
-  body: new URLSearchParams(fields),
+  headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: csrf.cookie },
+  body: new URLSearchParams({ ...fields, _csrf: csrf.token }),
   redirect: 'manual',
 });
 
@@ -103,7 +113,7 @@ test('the PDF and delete routes reject the same ids', async () => {
 });
 
 test('the delete confirmation carries the id as data, not as script', async () => {
-  const invoice = seedInvoice();
+  const invoice = await seedInvoice();
   const body = await (await fetch(`${base}/invoices/${invoice.id}`)).text();
 
   // An inline onsubmit would be HTML-escaped, which the browser undoes before
@@ -116,19 +126,19 @@ test('sending an invoice freezes the details it is being sent with', async () =>
   // The freeze must be decided on the status the record *had*. Reading the
   // submitted status froze one save too early and preserved the address from
   // the previous draft save -- an address the invoice was never sent with.
-  const draft = seedInvoice();
-  store.updateClient(client.id, { ...COYOTE, address: { ...COYOTE.address, street: '9 Rimrock Way' } });
+  const draft = await seedInvoice();
+  await store.updateClient(client.id, { ...COYOTE, address: { ...COYOTE.address, street: '9 Rimrock Way' } });
 
   const res = await post(`/invoices/${draft.id}`, formFields(draft, { status: 'sent' }));
   assert.equal(res.status, 302);
 
-  const saved = store.getInvoice(draft.id);
+  const saved = await store.getInvoice(draft.id);
   assert.equal(saved.status, 'sent');
   assert.equal(saved.billTo.address.street, '9 Rimrock Way');
 });
 
 test('the editor marks the saved style as the pressed one', async () => {
-  const draft = seedInvoice();
+  const draft = await seedInvoice();
   await post(`/invoices/${draft.id}`, formFields(draft, { style: 'modern' }));
 
   const body = await (await fetch(`${base}/invoices/${draft.id}`)).text();
@@ -140,7 +150,7 @@ test('the editor marks the saved style as the pressed one', async () => {
 });
 
 test('a sent invoice shows its style without offering to change it', async () => {
-  const sent = seedInvoice({ status: 'sent' });
+  const sent = await seedInvoice({ status: 'sent' });
   const body = await (await fetch(`${base}/invoices/${sent.id}`)).text();
 
   assert.ok(!/name="style"/.test(body), 'no style buttons on a frozen invoice');
@@ -152,14 +162,14 @@ test('choosing a style saves it, and an ordinary save keeps it', async () => {
   // submitted and every other save arrives with no style field at all. A
   // handler defaulting an absent style rather than falling back to the stored
   // one would quietly reset a Modern invoice to Classic on the next Save.
-  const draft = seedInvoice();
+  const draft = await seedInvoice();
   assert.equal(draft.style, 'classic', 'a new invoice starts in the vendor default');
 
   await post(`/invoices/${draft.id}`, formFields(draft, { style: 'modern' }));
-  assert.equal(store.getInvoice(draft.id).style, 'modern');
+  assert.equal((await store.getInvoice(draft.id)).style, 'modern');
 
   await post(`/invoices/${draft.id}`, formFields(draft, { notes: 'Thanks.' }));
-  const saved = store.getInvoice(draft.id);
+  const saved = await store.getInvoice(draft.id);
   assert.equal(saved.style, 'modern', 'a save that submits no style leaves it alone');
   assert.equal(saved.notes, 'Thanks.', 'and still saves what it did submit');
 });
@@ -168,48 +178,48 @@ test('a sent invoice keeps the style it was sent in', async () => {
   // Same reasoning as the snapshots: the client already has a PDF drawn one
   // way, and redrawing that invoice number another way makes one number into
   // two different-looking documents.
-  const sent = seedInvoice({ status: 'sent' });
+  const sent = await seedInvoice({ status: 'sent' });
   await post(`/invoices/${sent.id}`, formFields(sent, { style: 'modern' }));
 
-  assert.equal(store.getInvoice(sent.id).style, 'classic');
+  assert.equal((await store.getInvoice(sent.id)).style, 'classic');
 });
 
 test('a vendor default decides the style a new invoice starts in', async () => {
-  store.updateVendor(vendor.id, { ...ACME, defaultStyle: 'modern' });
+  await store.updateVendor(vendor.id, { ...ACME, defaultStyle: 'modern' });
   try {
-    const res = await post('/invoices', formFields(seedInvoice()));
+    const res = await post('/invoices', formFields(await seedInvoice()));
     assert.equal(res.status, 302);
     const created = res.headers.get('location').split('/').pop();
-    assert.equal(store.getInvoice(created).style, 'modern');
+    assert.equal((await store.getInvoice(created)).style, 'modern');
   } finally {
-    store.updateVendor(vendor.id, { ...ACME, defaultStyle: 'classic' });
+    await store.updateVendor(vendor.id, { ...ACME, defaultStyle: 'classic' });
   }
 });
 
 test('a sent invoice stops following the registry on the next save', async () => {
-  const sent = seedInvoice({ status: 'sent' });
+  const sent = await seedInvoice({ status: 'sent' });
   await post(`/invoices/${sent.id}`, formFields(sent, { notes: 'Thanks.' }));
-  store.updateClient(client.id, { ...COYOTE, address: { ...COYOTE.address, street: '9 Rimrock Way' } });
+  await store.updateClient(client.id, { ...COYOTE, address: { ...COYOTE.address, street: '9 Rimrock Way' } });
   await post(`/invoices/${sent.id}`, formFields(sent, { notes: 'Thanks again.' }));
 
-  const saved = store.getInvoice(sent.id);
+  const saved = await store.getInvoice(sent.id);
   assert.equal(saved.billTo.address.street, '22 Mesa Verde Rd');
   assert.equal(saved.notes, 'Thanks again.', 'the editable fields still save');
 });
 
 test('a submitted vendorId cannot move an invoice out of its number series', async () => {
-  const ajax = store.createVendor({ ...ACME, name: 'Ajax Novelty Co.', numberPrefix: 'AJX-' });
-  const sent = seedInvoice({ status: 'sent' });
+  const ajax = await store.createVendor({ ...ACME, name: 'Ajax Novelty Co.', numberPrefix: 'AJX-' });
+  const sent = await seedInvoice({ status: 'sent' });
 
   await post(`/invoices/${sent.id}`, formFields(sent, { vendorId: ajax.id }));
 
-  const saved = store.getInvoice(sent.id);
+  const saved = await store.getInvoice(sent.id);
   assert.equal(saved.vendorId, vendor.id, 'the vendor is fixed at creation');
   assert.ok(saved.id.startsWith('ACM-'), 'the number stays in the series that issued it');
 });
 
 test('the vendor picker disappears once the invoice exists', async () => {
-  const invoice = seedInvoice();
+  const invoice = await seedInvoice();
   const body = await (await fetch(`${base}/invoices/${invoice.id}`)).text();
   assert.ok(!body.includes('name="vendorId"'), 'no control that the server would ignore');
   assert.ok(body.includes('ACME Corporation'));
@@ -221,22 +231,22 @@ test('a fresh install is told what it is missing before it fills in a form', asy
   // and say nothing until a 422 came back with the whole form filled in. The
   // vendor is asked for first because it owns the number series.
   fs.rmSync(DATA_DIR, { recursive: true, force: true });
-  store.ensureDataDir();
+  await store.ensureDataDir();
 
   let body = await (await fetch(`${base}/invoices/new`)).text();
   assert.ok(body.includes('No vendors yet'), 'the vendor is the first thing missing');
   assert.ok(body.includes('/vendors/new'));
 
-  const onlyVendor = store.createVendor(ACME);
+  const onlyVendor = await store.createVendor(ACME);
   body = await (await fetch(`${base}/invoices/new`)).text();
   assert.ok(body.includes('No clients yet'), 'then the client');
   assert.ok(body.includes('/clients/new'));
 
   // A clientId cannot conjure a vendor into existence either.
-  const someClient = store.createClient(COYOTE);
+  const someClient = await store.createClient(COYOTE);
   body = await (await fetch(`${base}/invoices/new?clientId=${someClient.id}`)).text();
   assert.ok(body.includes('name="vendorId"') || body.includes('ACME Corporation'));
-  assert.equal(store.getVendor(onlyVendor.id).nextNumber, 1, 'nothing was allocated by looking');
+  assert.equal((await store.getVendor(onlyVendor.id)).nextNumber, 1, 'nothing was allocated by looking');
 });
 
 test('creating an invoice allocates a number and freezes the snapshot', async () => {
@@ -257,13 +267,13 @@ test('creating an invoice allocates a number and freezes the snapshot', async ()
   assert.equal(res.headers.get('location'), '/invoices/ACM-0001');
   assert.match(res.headers.get('set-cookie') || '', /flash=invoice-created%3AACM-0001/);
 
-  const saved = store.getInvoice('ACM-0001');
+  const saved = await store.getInvoice('ACM-0001');
   assert.equal(saved.number, 1);
   assert.equal(saved.lineItems[0].quantityMilli, 12500, 'quantity is stored in thousandths');
   assert.equal(saved.lineItems[0].rateCents, 15000, 'rate is stored in cents');
   assert.equal(saved.billTo.name, 'Wile E. Coyote', 'the client is snapshotted at creation');
   assert.equal(saved.remitFrom.name, 'ACME Corporation', 'so is the vendor');
-  assert.equal(store.getVendor(vendor.id).nextNumber, 2, 'the counter moved once');
+  assert.equal((await store.getVendor(vendor.id)).nextNumber, 2, 'the counter moved once');
 });
 
 test('an invoice that fails validation does not burn a number', async () => {
@@ -283,8 +293,8 @@ test('an invoice that fails validation does not burn a number', async () => {
 
   assert.equal(res.status, 422);
   assert.match(await res.text(), /needs at least one line item/);
-  assert.equal(store.getVendor(vendor.id).nextNumber, 1, 'the counter did not move');
-  assert.deepEqual(store.listInvoices(), [], 'and nothing was written');
+  assert.equal((await store.getVendor(vendor.id)).nextNumber, 1, 'the counter did not move');
+  assert.deepEqual(await store.listInvoices(), [], 'and nothing was written');
 });
 
 test('a well-formed id for an invoice that does not exist is a 404', async () => {
@@ -298,7 +308,7 @@ test('a well-formed id for an invoice that does not exist is a 404', async () =>
 });
 
 test('one unreadable file does not take the invoice list down with it', async () => {
-  const good = seedInvoice();
+  const good = await seedInvoice();
   fs.writeFileSync(path.join(DATA_DIR, 'invoices', 'ACM-0002.json'), '{"id": "ACM-000');
 
   const res = await fetch(`${base}/invoices`);
@@ -317,7 +327,7 @@ test('a file that parses but is not an invoice does not take the list down', asy
   // The unreadable guard used to catch only files that would not parse. `{}`
   // parses, reached invoiceTotals, and turned the list into a 500 -- so a
   // half-finished hand edit took out the page that was supposed to report it.
-  const good = seedInvoice();
+  const good = await seedInvoice();
   for (const [file, body] of Object.entries({
     'ACM-0002.json': '{}',
     'ACM-0003.json': '[]',
@@ -364,7 +374,7 @@ test('a server error explains itself without printing a filesystem path', async 
 });
 
 test('the PDF route serves the real document, inline or as a download', async () => {
-  const invoice = seedInvoice();
+  const invoice = await seedInvoice();
 
   const inline = await fetch(`${base}/invoices/${invoice.id}/pdf`);
   assert.equal(inline.status, 200);
@@ -379,10 +389,10 @@ test('a sent invoice keeps printing the vendor it was actually sent from', async
   // The snapshot rationale is about what a regenerated PDF says years later,
   // so the PDF is where it has to be asserted. The vendor side had no test at
   // all: only the client side did.
-  const sent = seedInvoice({ status: 'sent' });
+  const sent = await seedInvoice({ status: 'sent' });
   await post(`/invoices/${sent.id}`, formFields(sent, { notes: 'Sent.' }));
 
-  store.updateVendor(vendor.id, {
+  await store.updateVendor(vendor.id, {
     ...ACME, name: 'ACME Holdings LLC', address: { ...ACME.address, street: '4 Ledge Court' },
   });
 
@@ -437,7 +447,7 @@ test('a multi-line description survives the round trip to the PDF', async () => 
     'rate[]': '150',
   });
 
-  const saved = store.getInvoice('ACM-0001');
+  const saved = await store.getInvoice('ACM-0001');
   assert.equal(
     saved.lineItems[0].description,
     'Environment restoration\nRepo and dependency audit',

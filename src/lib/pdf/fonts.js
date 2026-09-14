@@ -13,23 +13,27 @@
  * releases, which is a question that simply does not arise if the bytes are
  * the ones IBM shipped.
  *
- * The path is resolved under ROOT_DIR and never with `new URL(...,
+ * The directory comes from src/paths.js and never from `new URL(...,
  * import.meta.url)`. A serverless bundler transpiles this module to CommonJS
  * and replaces `import.meta` with an empty object, so the URL form throws
  * while the module is still being imported -- which is exactly the trap
- * src/config.js documents and works around.
+ * src/paths.js documents and works around.
  *
  * Netlify's tracer follows imports, and a file read at runtime appears in no
  * import graph, so these are invisible to it. netlify.toml carries them in
  * `included_files` for the same reason it carries src/views, and
  * scripts/check-bundle.mjs asserts they arrived.
+ *
+ * Reading from that directory is only the default. `configureFonts` swaps
+ * the loader, so a host that keeps the faces somewhere else -- an asset
+ * store, a bundled byte array -- hands them over without this module knowing
+ * where they came from. It is the only place in the PDF code that touches a
+ * filesystem, which is what makes the rest of it portable.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import fontkit from '@pdf-lib/fontkit';
-import { ROOT_DIR } from '../../config.js';
-
-const DIR = path.join(ROOT_DIR, 'src/lib/pdf/fonts');
+import { FONTS_DIR } from '../../paths.js';
 
 export const MONO_REGULAR = 'IBMPlexMono-Regular.ttf';
 export const MONO_MEDIUM = 'IBMPlexMono-Medium.ttf';
@@ -47,19 +51,35 @@ export const MONO_MEDIUM = 'IBMPlexMono-Medium.ttf';
  */
 const cache = new Map();
 
-export function fontBytes(file) {
-  if (!cache.has(file)) {
-    try {
-      cache.set(file, fs.readFileSync(path.join(DIR, file)));
-    } catch (cause) {
-      throw new Error(
-        `Cannot read ${file} from ${DIR}. In a deploy this means the bundle does `
-        + 'not carry it: netlify.toml [functions] included_files must list '
-        + '"src/lib/pdf/fonts/**". Verify with `npm run check:bundle`.',
-        { cause },
-      );
-    }
+const readFromPackage = (file) => {
+  try {
+    return fs.readFileSync(path.join(FONTS_DIR, file));
+  } catch (cause) {
+    throw new Error(
+      `Cannot read ${file} from ${FONTS_DIR}. In a deploy this means the bundle does `
+      + 'not carry it: netlify.toml [functions] included_files must list '
+      + '"src/lib/pdf/fonts/**". Verify with `npm run check:bundle`.',
+      { cause },
+    );
   }
+};
+
+let load = readFromPackage;
+
+/**
+ * Replace how a face's bytes are found. `load(file)` takes the file name and
+ * returns a Buffer or Uint8Array; a missing face should throw, with a message
+ * that says where it looked. Clears the cache, since what is cached came
+ * from the previous loader. Call with no argument to restore the default.
+ */
+export function configureFonts({ load: loader = readFromPackage } = {}) {
+  if (typeof loader !== 'function') throw new TypeError('configureFonts needs a load(file) function.');
+  load = loader;
+  cache.clear();
+}
+
+export function fontBytes(file) {
+  if (!cache.has(file)) cache.set(file, load(file));
   return cache.get(file);
 }
 

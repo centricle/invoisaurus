@@ -52,7 +52,7 @@ const bottom = (op) => (op.kind === 'text'
  *
  * Tracking adds its space *after* every glyph, the last one included, so the
  * advance is one gap wider than the ink. Right alignment wants the ink, or a
- * tracked label sits a point or two left of the column it is labelling.
+ * tracked label sits a point or two left of the column it is labeling.
  */
 const widthOf = (string, face, size, tracking = 0) =>
   face.widthOfTextAtSize(string, size) + tracking * Math.max(0, string.length - 1);

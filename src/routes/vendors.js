@@ -1,5 +1,4 @@
 import express from 'express';
-import { listVendors, getVendor, createVendor, updateVendor } from '../store.js';
 import { makeVendor, validateVendor, emptyAddress, INVOICE_STYLES } from '../schema.js';
 import { setFlash } from '../flash.js';
 
@@ -21,8 +20,8 @@ const fromForm = (body) => ({
   },
 });
 
-vendorsRouter.get('/', (req, res) => {
-  res.render('vendors/index', { vendors: listVendors() });
+vendorsRouter.get('/', async (req, res) => {
+  res.render('vendors/index', { vendors: await req.store.listVendors() });
 });
 
 vendorsRouter.get('/new', (req, res) => {
@@ -31,25 +30,29 @@ vendorsRouter.get('/new', (req, res) => {
   });
 });
 
-vendorsRouter.post('/', (req, res) => {
+vendorsRouter.post('/', async (req, res) => {
+  const { store } = req;
   const input = fromForm(req.body);
-  const errors = validateVendor(input, { takenPrefixes: listVendors().map((v) => v.numberPrefix) });
+  const errors = validateVendor(input, {
+    takenPrefixes: (await store.listVendors()).map((v) => v.numberPrefix),
+  });
   if (errors.length) {
     return res.status(422).render('vendors/form', { vendor: input, isNew: true, errors, INVOICE_STYLES });
   }
-  const vendor = createVendor(input);
+  const vendor = await store.createVendor(input);
   setFlash(res, 'vendor-created', vendor.name);
   res.redirect(`/vendors/${vendor.id}/edit`);
 });
 
-vendorsRouter.get('/:id/edit', (req, res) => {
-  const vendor = getVendor(req.params.id);
+vendorsRouter.get('/:id/edit', async (req, res) => {
+  const vendor = await req.store.getVendor(req.params.id);
   if (!vendor) return res.status(404).render('404', { what: 'Vendor' });
   res.render('vendors/form', { vendor, isNew: false, errors: [], INVOICE_STYLES });
 });
 
-vendorsRouter.post('/:id', (req, res) => {
-  const existing = getVendor(req.params.id);
+vendorsRouter.post('/:id', async (req, res) => {
+  const { store } = req;
+  const existing = await store.getVendor(req.params.id);
   if (!existing) return res.status(404).render('404', { what: 'Vendor' });
   // fromForm never reads an id from the request, so this can only ever be the
   // existing one. It is carried for the re-render on validation failure; the
@@ -59,12 +62,12 @@ vendorsRouter.post('/:id', (req, res) => {
     existing,
     // Every prefix but this vendor's own -- an edit that leaves the prefix
     // alone must not collide with itself.
-    takenPrefixes: listVendors().filter((v) => v.id !== existing.id).map((v) => v.numberPrefix),
+    takenPrefixes: (await store.listVendors()).filter((v) => v.id !== existing.id).map((v) => v.numberPrefix),
   });
   if (errors.length) {
     return res.status(422).render('vendors/form', { vendor: input, isNew: false, errors, INVOICE_STYLES });
   }
-  updateVendor(existing.id, input);
+  await store.updateVendor(existing.id, input);
   setFlash(res, 'vendor-saved');
   res.redirect('/vendors');
 });

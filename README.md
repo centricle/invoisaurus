@@ -1,12 +1,18 @@
 # Invoisaurus
 
-Local invoice generator. Web UI in, PDF out.
+Invoice generator. Web UI in, PDF out.
 
 Built to replace a hosted invoicing product whose UI was slow and whose site was
-down during an actual billing attempt. Runs on your machine, stores plain JSON,
-and generates the PDF you send to the client. No account, no network, no
-database. The server binds loopback only, so an editor with no login on it does
-not appear on whatever network the machine has joined.
+down during an actual billing attempt. The local tool runs on your machine,
+stores plain JSON, and generates the PDF you send to the client. It needs no
+account, no network and no database, and the server binds loopback only, so an
+editor with no login on it does not appear on whatever network the machine has
+joined.
+
+The same code is also a package. The routes, the record rules and the PDF
+engine are built by a factory that takes its store, its mount point and its
+chrome as arguments, so a host of your own can put accounts, a database and
+billing around them without editing a route. See [Use as a package](#use-as-a-package).
 
 ![The invoice editor: line items, live totals and a notes field](docs/editor.webp)
 
@@ -81,7 +87,9 @@ One thing worth knowing before you start numbering for real: **invoice numbers
 are never reused within a vendor's lifetime.** Delete `ACM-0003` and the next
 invoice is still `ACM-0004`. A gap in the series is a voided invoice; a
 duplicate is an accounting problem. Removing the demo vendor entirely does reset
-the counter, because the counter lives on the vendor record.
+the counter, because the counter lives on the vendor record. The guarantee holds
+within one running app: two processes writing the same data directory at once
+are not coordinated, so run one at a time.
 
 ## Demo mode
 
@@ -110,9 +118,10 @@ What is different from the normal app:
   thing, produced from whatever you typed by the same code the local tool uses.
 - A banner and a `DEMO` badge appear on every page.
 
-Everything else is the same code. Demo mode swaps the storage layer underneath
-`src/store.js` rather than branching inside the routes, so validation, invoice
-numbering, the snapshot freeze and the PDF are all the ones described above.
+Everything else is the same code. Every request carries the store its handlers
+read from, and in demo mode that is the visitor's own, held in memory. The
+routes never branch on the mode, so validation, invoice numbering, the snapshot
+freeze and the PDF are all the ones described above.
 
 ### Serving it under a path prefix
 
@@ -145,12 +154,15 @@ environment variable rather than editing the repo:
 
 ```sh
 netlify env:set BASE_PATH "/some/prefix"
+netlify env:set ALLOW_ORIGINS "https://example.com"
 ```
 
 That reaches both the build, which stages the assets into a matching directory,
 and the function at runtime. A variable set in `netlify.toml`'s
 `[build.environment]` would reach only the build, and the app would then serve
-at the root while its assets sat one directory down.
+at the root while its assets sat one directory down. `ALLOW_ORIGINS` names the
+site the browser actually sees, for the form-post check described under
+[Design](#design); a current browser passes that check without it.
 
 To reproduce the build the way CI runs it:
 
@@ -188,6 +200,15 @@ never alters a past invoice, because an invoice is a record of what was sent.
 
 **Invoice numbers are per-vendor.** The number is the issuing entity's book.
 Each vendor carries its own prefix, padding and counter.
+
+**A form post has to prove where it came from.** Any page on the internet can
+make a browser submit a form to any address, cookies attached. Locally that is
+moot, but hosted, the same handlers are a public write surface. So every request
+that changes something is checked: a current browser's own `Sec-Fetch-Site` and
+`Origin` headers settle it, and a client that sends neither has to echo a token
+the page carried in a hidden field, from a cookie another site cannot read. A
+request that fails gets a page explaining what to do, not a silent save of
+nothing. `src/csrf.js` has the mechanism.
 
 ### Two styles
 
@@ -253,6 +274,7 @@ back.
 | `NODE_ENV` | unset | `production` enables template caching |
 | `DEMO_MODE` | unset | `true` runs [demo mode](#demo-mode): in-memory records, nothing written |
 | `BASE_PATH` | empty | Serve the app under a path prefix, e.g. `/etc/invoisaurus` |
+| `ALLOW_ORIGINS` | empty | Comma-separated origins a browser may post from, when the app is proxied under another site |
 | `INVOISAURUS_ROOT` | derived | Where the app's own files are. Only needed when bundling, which strips `import.meta` |
 
 `DEMO_MODE` is compared against the exact string `true`, so a stray
@@ -307,6 +329,12 @@ accident. `test/routes.test.js` runs the real Express app against one of those
 directories on an ephemeral port, so the request handlers are covered too, not
 just the pure functions underneath them.
 
+`test/store-contract.js` is the store contract: one script of creates, renames,
+allocations, saves and deletes, run against a store and compared line by line
+with a recorded answer key. Both stores in this repository answer it, and a
+store written elsewhere can import it as `invoisaurus/testing` and be held to
+the same key.
+
 `.github/workflows/test.yml` runs the same command on pushes to `main` and on
 every pull request, against the Node version pinned in `.nvmrc`.
 
@@ -314,13 +342,18 @@ every pull request, against the Node version pinned in `.nvmrc`.
 
 | Path | Purpose |
 |---|---|
-| `server.js` | Express entry, mounts routes |
-| `src/config.js` | Resolves the data directory, port and project root |
+| `server.js` | Entry point: reads the environment and builds the local tool or the demo |
+| `src/app.js` | `createApp()`: the routes, views and middleware, as a function of options |
+| `src/config.js` | What the entry point reads from the environment |
+| `src/paths.js` | Where this package's own templates, assets and fonts are |
 | `src/schema.js` | Record shapes and validation. The single definition of the data model. |
-| `src/store.js` | Record rules: atomic writes, invoice number allocation, the create/update split |
+| `src/store.js` | `createJsonStore()`: record rules over a directory. Atomic writes, number allocation, the create/update split |
 | `src/storage.js` | Where those records physically live. Filesystem by default |
-| `src/storage-memory.js` | The in-memory backend demo mode swaps in |
-| `src/demo.js` | Per-session demo stores, seeding, and the reset |
+| `src/storage-memory.js` | The in-memory backend the demo uses |
+| `src/demo.js` | `createGuestSessions()`: a store per visitor, and the reset |
+| `src/seed.js` | Populates any store with the ACME cast, through the store's own methods |
+| `src/csrf.js` | The form-post check |
+| `src/cookies.js` | Reads one cookie. Used by the flash, the demo and the check above |
 | `src/fixtures/acme.js` | The ACME cast, shared by the seeder and the demo |
 | `src/money.js` | Integer-cent arithmetic and formatting |
 | `src/lib/markup.js` | The formatting subset, text to blocks. Knows nothing about PDFs |
@@ -332,15 +365,79 @@ every pull request, against the Node version pinned in `.nvmrc`.
 | `public/js/` | Browser-side behavior: the invoice editor, the number steppers on the vendor and invoice forms, and the formatting help popover |
 | `netlify/` | The hosted demo: one function wrapping the same Express app |
 | `netlify.toml` | How that deploy is built and routed |
+| `test/store-contract.js` | The store contract and its answer key, exported as `invoisaurus/testing` |
 
 Express 5, EJS, Tailwind 4 via the CLI, pdf-lib. Line-item arithmetic is vanilla
 JS in the browser; everything else is a form POST. No bundler, no client
 framework, five runtime dependencies. `@pdf-lib/fontkit` is what lets the Modern
 style embed a font file, and `serverless-http` is used only by the hosted demo.
 
+## Use as a package
+
+```sh
+npm install invoisaurus
+```
+
+The smallest working host is the one the tests use:
+
+```js
+import { createApp } from 'invoisaurus';
+import { createJsonStore } from 'invoisaurus/store';
+import { createMemoryBackend } from 'invoisaurus/memory';
+
+const store = createJsonStore({ backend: createMemoryBackend(), dataDir: '/records' });
+await store.ensureDataDir();
+
+const app = createApp({
+  store,                     // or attach req.store in middleware, per request
+  basePath: '',              // or '/etc/invoisaurus'
+  middleware: [],            // runs after static files, before the routers
+  home: true,                // GET / redirects to the invoice list
+  allowOrigins: [],          // proxies a browser may post from
+  locals: {},                // defaults for the chrome: banner, badge, navRight, footer
+  mount(app, { u }) {},      // extra routes, added before the 404 handler
+});
+app.listen(7054, '127.0.0.1');
+```
+
+**The store is the seam.** `createApp` never imports one. A request reads
+whatever `req.store` holds, which is either the `store` given here or what a
+middleware attached -- a visitor's memory, a directory, a tenant's tables. Any
+object that answers the contract in `test/store-contract.js` will do, and
+`invoisaurus/testing` exports `assertStoreContract(makeStore)` so a new one can
+prove it. Every method is async, including the ones the JSON store answers
+synchronously underneath, so a store that has to wait on a database is a
+drop-in rather than a rewrite of every caller.
+
+**The chrome has slots, not modes.** Middleware sets `res.locals.banner`,
+`badge`, `navRight`, `footer` and `watermark` per request, in the shapes
+documented at the top of `src/views/partials/layout-head.ejs`, and the layout
+renders what it is given. That is how the demo says "this is a demo" and how a
+host says who is signed in, from one set of templates.
+
+**Two things a bundler cannot see.** The templates and the Modern style's font
+files are read at runtime, so a serverless bundle has to carry them: list
+`node_modules/invoisaurus/src/views/**` and `node_modules/invoisaurus/src/lib/pdf/fonts/**`
+in `included_files`, and set `INVOISAURUS_ROOT` to the package directory inside
+the bundle, exactly as `netlify/demo-env.js` does for the demo. A host that
+keeps the fonts elsewhere passes a loader to `configureFonts` from
+`invoisaurus/fonts` instead. The stylesheet is generated, not shipped: build it
+from `public/css/app.css` with the Tailwind CLI, pointing `@source` at both
+sets of templates.
+
+The rest of the surface -- `invoisaurus/schema`, `/money`, `/markup`, `/pdf`,
+`/demo`, `/seed`, `/fixtures`, `/csrf`, `/flash`, `/cookies`, `/paths` -- is
+the same modules the local tool is made of, under the names in `package.json`.
+
 ## License
 
-[MIT](./LICENSE)
+[AGPL-3.0-only](./LICENSE), from 2.0.0. Copyright 2026 Kevin Smith.
+
+Versions 1.x were released under MIT and remain so; the tags carry their own
+license file. The change protects the one thing MIT does not: someone can run
+this, change it and host it, but not as a closed service. Running an unmodified
+copy for yourself, or a modified one you publish the source of, is exactly what
+the license is for.
 
 IBM Plex Mono, in `src/lib/pdf/fonts/`, is licensed separately under the
 [SIL Open Font License 1.1](./src/lib/pdf/fonts/OFL.txt) and is shipped unmodified.

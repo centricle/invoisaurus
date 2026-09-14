@@ -1,99 +1,39 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // Binds INVOISAURUS_DATA_DIR before config.js resolves it. See test/tmpdir.js.
-import './tmpdir.js';
+import { DATA_DIR } from './tmpdir.js';
 import fs from 'node:fs';
-import { fsBackend, useBackendResolver } from '../src/storage.js';
+import { fsBackend } from '../src/storage.js';
 import { createMemoryBackend } from '../src/storage-memory.js';
-import { DATA_DIR } from '../src/config.js';
-import * as store from '../src/store.js';
+import { createJsonStore } from '../src/store.js';
+import { storeContractScript } from './store-contract.js';
 
 /**
  * The demo runs the real store against a different backend. That is only safe
- * if the two are indistinguishable to store.js, so rather than assert the
- * memory backend "looks right", run one script of operations against both and
- * require the same answers -- including the same thrown messages.
- *
- * Every invariant exercised below is one the audit or a past bug put there:
- * ids are immutable, an update cannot invent a record, a create cannot
- * overwrite one, and a number is never reused after a delete.
+ * if the two are indistinguishable to store.js, so the contract script is run
+ * against both and the same answers are required. The script itself lives in
+ * test/store-contract.js, because a third store implements it too.
  */
-function script() {
-  const log = [];
-  const say = (label, value) => log.push(`${label}: ${JSON.stringify(value)}`);
-  const sayThrow = (label, fn) => {
-    try { fn(); say(label, 'NO THROW'); } catch (err) { say(label, err.message.replace(DATA_DIR, '<DATA_DIR>')); }
-  };
+const redact = (s) => s.replaceAll(DATA_DIR, '<DATA_DIR>');
 
-  store.ensureDataDir();
-  say('empty vendors', store.listVendors());
-  say('empty invoices', store.listInvoices());
-
-  const vendor = store.createVendor({ name: 'ACME Corporation', numberPrefix: 'ACM-', numberPad: 4, nextNumber: 1 });
-  say('vendor id', vendor.id);
-
-  const client = store.createClient({ name: 'Wile E. Coyote', type: 'individual' });
-  say('client id', client.id);
-
-  // Renaming must not mint a second record or change the id.
-  const renamed = store.updateClient(client.id, { ...client, name: 'Carnivorous Vulgaris, LLC', type: 'business' });
-  say('id after rename', renamed.id);
-  say('client count after rename', store.listClients().length);
-  say('createdAt preserved', renamed.createdAt === client.createdAt);
-
-  sayThrow('update unknown id', () => store.updateClient('nope', { name: 'X', type: 'business' }));
-
-  // Allocation advances the vendor counter and never hands back the same number.
-  const first = store.allocateInvoiceNumber(vendor.id);
-  const second = store.allocateInvoiceNumber(vendor.id);
-  say('allocated', [first.id, second.id]);
-  say('nextNumber', store.getVendor(vendor.id).nextNumber);
-
-  const invoice = store.saveInvoice({
-    id: first.id, number: first.number, vendorId: vendor.id, clientId: client.id,
-    issueDate: '2026-09-09', lineItems: [{ description: 'Anvil', quantityMilli: 2000, rateCents: 8500 }],
-  }, { create: true });
-  say('saved', invoice.id);
-
-  sayThrow('create over existing', () => store.saveInvoice({ ...invoice }, { create: true }));
-
-  say('scan', store.scanInvoices().invoices.map((i) => i.id));
-  say('count for client', store.invoiceCountForClient(client.id));
-
-  store.deleteInvoice(invoice.id);
-  say('after delete', store.listInvoices().map((i) => i.id));
-  // The gap is the point: a deleted invoice's number is retired, not recycled.
-  say('next after delete', store.allocateInvoiceNumber(vendor.id).id);
-
-  // A counter may never move backward, whichever backend is underneath.
-  const clamped = store.updateVendor(vendor.id, { ...store.getVendor(vendor.id), nextNumber: 1 });
-  say('counter floor', clamped.nextNumber);
-
-  return log;
-}
-
-test('the memory backend is indistinguishable from the filesystem', () => {
+test('the memory backend is indistinguishable from the filesystem', async () => {
   fs.rmSync(DATA_DIR, { recursive: true, force: true });
-  useBackendResolver(() => fsBackend);
-  const onDisk = script();
+  const onDisk = await storeContractScript(createJsonStore({ dataDir: DATA_DIR }), { redact });
 
   const memory = createMemoryBackend();
-  useBackendResolver(() => memory);
-  const inMemory = script();
-
-  useBackendResolver(() => fsBackend);
+  const inMemory = await storeContractScript(
+    createJsonStore({ backend: memory, dataDir: DATA_DIR }), { redact },
+  );
 
   assert.deepEqual(inMemory, onDisk);
-  assert.ok(onDisk.length > 15, 'the script should actually exercise something');
+  assert.ok(onDisk.length > 30, 'the script should actually exercise something');
 });
 
-test('the demo backend writes nothing to disk', () => {
+test('the demo backend writes nothing to disk', async () => {
   fs.rmSync(DATA_DIR, { recursive: true, force: true });
 
   const memory = createMemoryBackend();
-  useBackendResolver(() => memory);
-  script();
-  useBackendResolver(() => fsBackend);
+  await storeContractScript(createJsonStore({ backend: memory, dataDir: DATA_DIR }));
 
   // The requirement, tested directly rather than inferred: after a full script
   // of creates, updates, saves and deletes, the data directory does not exist.
@@ -123,4 +63,19 @@ test('both backends return copies, not references', () => {
   }
 
   fs.rmSync(DATA_DIR, { recursive: true, force: true });
+});
+
+test('a memory backend survives a round trip through plain data', async () => {
+  // dump() is how a visitor's records leave the container they were made in.
+  const memory = createMemoryBackend();
+  await storeContractScript(createJsonStore({ backend: memory, dataDir: DATA_DIR }));
+
+  const copy = createMemoryBackend();
+  copy.load(memory.dump());
+  const original = createJsonStore({ backend: memory, dataDir: DATA_DIR });
+  const restored = createJsonStore({ backend: copy, dataDir: DATA_DIR });
+
+  assert.deepEqual(await restored.listInvoices(), await original.listInvoices());
+  assert.deepEqual(await restored.listVendors(), await original.listVendors());
+  assert.notEqual(memory.dump(), copy.dump(), 'the snapshot is a copy, not the map');
 });

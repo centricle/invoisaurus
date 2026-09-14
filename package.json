@@ -1,9 +1,56 @@
 {
   "name": "invoisaurus",
-  "version": "1.3.0",
-  "private": true,
+  "version": "2.0.0",
+  "description": "Invoice generator. Web UI in, PDF out. Runs locally on JSON files, or as a package inside a host of your own.",
+  "license": "AGPL-3.0-only",
+  "author": "Kevin Smith <ksmith@centricle.com> (https://centricle.com)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/centricle/invoisaurus.git"
+  },
+  "keywords": [
+    "invoice",
+    "invoicing",
+    "pdf",
+    "pdf-lib",
+    "express",
+    "self-hosted",
+    "local-first",
+    "open-core"
+  ],
   "type": "module",
-  "description": "Local invoice generator. Web UI in, PDF out.",
+  "main": "./src/app.js",
+  "exports": {
+    ".": "./src/app.js",
+    "./store": "./src/store.js",
+    "./storage": "./src/storage.js",
+    "./memory": "./src/storage-memory.js",
+    "./schema": "./src/schema.js",
+    "./money": "./src/money.js",
+    "./markup": "./src/lib/markup.js",
+    "./pdf": "./src/lib/pdf/generate.js",
+    "./fonts": "./src/lib/pdf/fonts.js",
+    "./demo": "./src/demo.js",
+    "./seed": "./src/seed.js",
+    "./fixtures": "./src/fixtures/acme.js",
+    "./csrf": "./src/csrf.js",
+    "./cookies": "./src/cookies.js",
+    "./flash": "./src/flash.js",
+    "./paths": "./src/paths.js",
+    "./testing": "./test/store-contract.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "server.js",
+    "src/",
+    "public/",
+    "!public/css/dist/",
+    "scripts/",
+    "netlify/",
+    "netlify.toml",
+    "test/store-contract.js",
+    "test/store-contract.golden.json"
+  ],
   "scripts": {
     "setup": "sh scripts/bootstrap.sh",
     "dev": "concurrently -n css,web -c magenta,green \"npm:css\" \"node --watch server.js\"",
@@ -28,21 +75,6 @@
     "@tailwindcss/cli": "^4.1.18",
     "concurrently": "^10.0.5"
   },
-  "license": "MIT",
-  "author": "Kevin Smith <ksmith@centricle.com> (https://centricle.com)",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/centricle/invoisaurus.git"
-  },
-  "keywords": [
-    "invoice",
-    "invoicing",
-    "pdf",
-    "pdf-lib",
-    "express",
-    "self-hosted",
-    "local-first"
-  ],
   "engines": {
     "node": ">=22.6.0"
   }

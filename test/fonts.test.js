@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import './tmpdir.js';
 import fontkit from '@pdf-lib/fontkit';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { fontBytes, embedBundled, MONO_REGULAR, MONO_MEDIUM } from '../src/lib/pdf/fonts.js';
+import { fontBytes, embedBundled, configureFonts, MONO_REGULAR, MONO_MEDIUM } from '../src/lib/pdf/fonts.js';
 import { sanitize } from '../src/lib/pdf/layout.js';
 
 /**
@@ -79,4 +79,33 @@ test('a bundled face embeds subset, not whole', async () => {
 
   const bytes = await doc.save();
   assert.ok(bytes.length < 40_000, `expected a subset, got ${bytes.length} bytes`);
+});
+
+test('a host can supply the faces from somewhere other than this package', () => {
+  // The only filesystem read in the PDF code, swapped for a loader that knows
+  // nothing about a directory. What comes back must be the bytes it returned,
+  // and restoring the default must forget them.
+  const fromPackage = fontBytes(MONO_REGULAR);
+  const requested = [];
+  try {
+    configureFonts({ load: (file) => { requested.push(file); return fromPackage.subarray(0, 16); } });
+    assert.equal(fontBytes(MONO_REGULAR).length, 16, 'bytes come from the loader');
+    assert.equal(fontBytes(MONO_REGULAR).length, 16, 'and are cached');
+    assert.deepEqual(requested, [MONO_REGULAR], 'the loader was asked once, by file name');
+  } finally {
+    configureFonts();
+  }
+  assert.equal(fontBytes(MONO_REGULAR).length, fromPackage.length, 'the default is back and the cache is fresh');
+  assert.throws(() => configureFonts({ load: 'nope' }), TypeError);
+});
+
+test('a face that cannot be found fails on the PDF, not on startup', () => {
+  // Lazy on purpose: a missing file should fail the one route that needs it,
+  // with a message that names the fix, and leave every other page working.
+  try {
+    configureFonts({ load: (file) => { throw new Error(`no ${file} here`); } });
+    assert.throws(() => fontBytes(MONO_MEDIUM), /no IBMPlexMono-Medium.ttf here/);
+  } finally {
+    configureFonts();
+  }
 });

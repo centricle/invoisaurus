@@ -1,9 +1,5 @@
 import express from 'express';
 import {
-  scanInvoices, getInvoice, saveInvoice, deleteInvoice, allocateInvoiceNumber,
-  listClients, getClient, listVendors, getVendor,
-} from '../store.js';
-import {
   makeInvoice, validateInvoice, invoiceTotals,
   dueDateFor, today, TERMS, INVOICE_STATUSES, INVOICE_STYLES, styleId,
   withSnapshots, isOverdue, INVOICE_ID,
@@ -11,7 +7,6 @@ import {
 import { parseCents, parseQuantity } from '../money.js';
 import { generateInvoicePdf } from '../lib/pdf/generate.js';
 import { setFlash } from '../flash.js';
-import { DEMO_MODE } from '../config.js';
 
 export const invoicesRouter = express.Router();
 
@@ -79,32 +74,38 @@ const invoiceFromForm = (body) => ({
 });
 
 
-const renderContext = (invoice, errors = []) => ({
+/**
+ * Everything the editor needs besides the record. The store is the request's:
+ * whichever one the app mounted -- a directory, a visitor's memory, a tenant's
+ * tables -- these handlers never import one and never find out.
+ */
+const renderContext = async (store, invoice, errors = []) => ({
   invoice,
-  // getInvoice hands back what is on disk, not a record through makeInvoice, so
+  // The store hands back what is on disk, not a record through makeInvoice, so
   // an invoice written before styles existed carries no `style` key. The PDF
   // route survives that on styleFor's fallback; the toggle would compare every
   // button against undefined and light none of them. Resolve the fallback here
   // rather than in the template, so the view compares two real style ids.
   currentStyle: styleId(invoice.style),
   totals: invoiceTotals(invoice),
-  clients: listClients(),
-  vendors: listVendors(),
+  clients: await store.listClients(),
+  vendors: await store.listVendors(),
   TERMS,
   INVOICE_STATUSES,
   INVOICE_STYLES,
   errors,
 });
 
-invoicesRouter.get('/', (req, res) => {
-  const clients = listClients();
+invoicesRouter.get('/', async (req, res) => {
+  const { store } = req;
+  const clients = await store.listClients();
   const { client: clientFilter = '', status: statusFilter = '' } = req.query;
 
   // Files that would not parse are listed alongside the invoices rather than
   // thrown. They carry no client and no status, so no filter can describe one
   // and they are shown whatever the filter says -- a damaged file that only
   // appears under the right filter is a damaged file nobody finds.
-  const { invoices: readable, unreadable } = scanInvoices();
+  const { invoices: readable, unreadable } = await store.scanInvoices();
 
   const invoices = readable
     .filter((inv) => (!clientFilter || inv.clientId === clientFilter))
@@ -122,7 +123,7 @@ invoicesRouter.get('/', (req, res) => {
     .reduce((sum, inv) => sum + inv.totalCents, 0);
 
   res.render('invoices/index', {
-    invoices, unreadable, clients, vendors: listVendors(), INVOICE_STATUSES,
+    invoices, unreadable, clients, vendors: await store.listVendors(), INVOICE_STATUSES,
     clientFilter, statusFilter,
     outstandingCents,
     // Wrapped, not passed by reference: Array.filter supplies the index as the
@@ -139,9 +140,10 @@ invoicesRouter.get('/', (req, res) => {
  * sending Client A's invoice to Client B, which is a phone call rather than a
  * keystroke to undo.
  */
-invoicesRouter.get('/new', (req, res) => {
-  const clients = listClients();
-  const vendors = listVendors();
+invoicesRouter.get('/new', async (req, res) => {
+  const { store } = req;
+  const clients = await store.listClients();
+  const vendors = await store.listVendors();
   const client = clients.find((c) => c.id === req.query.clientId);
 
   // No vendors is the same kind of dead end as no clients, and it arrives first
@@ -155,28 +157,27 @@ invoicesRouter.get('/new', (req, res) => {
     clientId: client.id,
     lineItems: [{ description: '', quantityMilli: null, rateCents: null }],
   });
-  const seeded = withSnapshots(invoice, { vendor: getVendor(invoice.vendorId), client });
-  res.render('invoices/form', { ...renderContext(seeded), isNew: true });
+  const seeded = withSnapshots(invoice, { vendor: await store.getVendor(invoice.vendorId), client });
+  res.render('invoices/form', { ...await renderContext(store, seeded), isNew: true });
 });
 
-invoicesRouter.post('/', (req, res) => {
+invoicesRouter.post('/', async (req, res) => {
+  const { store } = req;
   const form = invoiceFromForm(req.body);
+  const vendor = await store.getVendor(form.vendorId);
   const input = makeInvoice({
     ...form,
-    style: form.style || getVendor(form.vendorId)?.defaultStyle,
+    style: form.style || vendor?.defaultStyle,
   });
-  const errors = validateInvoice(input, {
-    vendor: getVendor(input.vendorId), client: getClient(input.clientId),
-  });
+  const client = await store.getClient(input.clientId);
+  const errors = validateInvoice(input, { vendor, client });
   if (errors.length) {
-    return res.status(422).render('invoices/form', { ...renderContext(input, errors), isNew: true });
+    return res.status(422).render('invoices/form', { ...await renderContext(store, input, errors), isNew: true });
   }
   // The number is allocated here and not when the form opened, so abandoning a
-  // draft does not burn a number out of the series.
-  const { number, id } = allocateInvoiceNumber(input.vendorId);
-  const invoice = saveInvoice(withSnapshots({ ...input, id, number }, {
-    vendor: getVendor(input.vendorId), client: getClient(input.clientId), force: true,
-  }), { create: true });
+  // draft does not burn a number out of the series. The snapshot is taken
+  // first so the store writes a complete record in one step.
+  const invoice = await store.createInvoice(withSnapshots(input, { vendor, client, force: true }));
   setFlash(res, 'invoice-created', invoice.id);
   res.redirect(`/invoices/${invoice.id}`);
 });
@@ -187,13 +188,14 @@ invoicesRouter.post('/', (req, res) => {
  * the client actually receives.
  */
 invoicesRouter.get('/:id/pdf', async (req, res, next) => {
-  const invoice = getInvoice(req.params.id);
+  const invoice = await req.store.getInvoice(req.params.id);
   if (!invoice) return res.status(404).render('404', { what: 'Invoice' });
   try {
-    // Really generated from this visitor's own records, watermarked rather
-    // than withheld. A canned PDF would contradict the form they just filled
-    // in, and the document is the half of this tool worth showing.
-    const bytes = await generateInvoicePdf(invoice, { watermark: DEMO_MODE });
+    // A guest's PDF is really generated from their own records, watermarked
+    // rather than withheld. A canned PDF would contradict the form they just
+    // filled in, and the document is the half of this tool worth showing.
+    // Whoever attached the store decides; see `watermark` in src/demo.js.
+    const bytes = await generateInvoicePdf(invoice, { watermark: Boolean(res.locals.watermark) });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
@@ -213,14 +215,15 @@ invoicesRouter.get('/:id/pdf', async (req, res, next) => {
   }
 });
 
-invoicesRouter.get('/:id', (req, res) => {
-  const invoice = getInvoice(req.params.id);
+invoicesRouter.get('/:id', async (req, res) => {
+  const invoice = await req.store.getInvoice(req.params.id);
   if (!invoice) return res.status(404).render('404', { what: 'Invoice' });
-  res.render('invoices/form', { ...renderContext(invoice), isNew: false });
+  res.render('invoices/form', { ...await renderContext(req.store, invoice), isNew: false });
 });
 
-invoicesRouter.post('/:id', (req, res) => {
-  const existing = getInvoice(req.params.id);
+invoicesRouter.post('/:id', async (req, res) => {
+  const { store } = req;
+  const existing = await store.getInvoice(req.params.id);
   if (!existing) return res.status(404).render('404', { what: 'Invoice' });
 
   // The vendor is fixed at creation, so it is taken from the stored record and
@@ -243,25 +246,23 @@ invoicesRouter.post('/:id', (req, res) => {
     billTo: existing.billTo,
     remitFrom: existing.remitFrom,
   });
-  const errors = validateInvoice(input, {
-    vendor: getVendor(input.vendorId), client: getClient(input.clientId),
-  });
+  const vendor = await store.getVendor(input.vendorId);
+  const client = await store.getClient(input.clientId);
+  const errors = validateInvoice(input, { vendor, client });
   if (errors.length) {
-    return res.status(422).render('invoices/form', { ...renderContext(input, errors), isNew: false });
+    return res.status(422).render('invoices/form', { ...await renderContext(store, input, errors), isNew: false });
   }
-  saveInvoice(withSnapshots(input, {
-    vendor: getVendor(input.vendorId), client: getClient(input.clientId), storedStatus: existing.status,
-  }));
+  await store.saveInvoice(withSnapshots(input, { vendor, client, storedStatus: existing.status }));
   setFlash(res, 'invoice-saved');
   res.redirect(`/invoices/${existing.id}`);
 });
 
-invoicesRouter.post('/:id/delete', (req, res) => {
-  const invoice = getInvoice(req.params.id);
+invoicesRouter.post('/:id/delete', async (req, res) => {
+  const invoice = await req.store.getInvoice(req.params.id);
   if (!invoice) return res.status(404).render('404', { what: 'Invoice' });
   // The vendor counter is deliberately not rewound. A gap in the series is a
   // deleted draft; a reused number is an accounting problem.
-  deleteInvoice(invoice.id);
+  await req.store.deleteInvoice(invoice.id);
   setFlash(res, 'invoice-deleted', invoice.id);
   res.redirect('/invoices');
 });

@@ -20,13 +20,15 @@
  * banner; `toString` renders "[object Object]". Escaped either way, so not
  * markup injection -- but "a code from the fixed set" has to mean the set.
  */
-import { BASE_PATH } from './config.js';
+import { readCookie } from './cookies.js';
 
 const COOKIE = 'flash';
 // Scoped to where the app is mounted. Set at '/' while the app lives under
 // a prefix, the browser would return it to the parent site too, and
-// clearCookie at a different path silently fails to clear anything.
-const COOKIE_PATH = BASE_PATH || '/';
+// clearCookie at a different path silently fails to clear anything. The app
+// records the path in its locals (src/app.js); a bare response with no app
+// behind it -- the unit tests -- gets the root.
+const cookiePath = (res) => res.app?.locals?.cookiePath || '/';
 
 const MESSAGES = {
   'invoice-created': (id) => `Invoice ${id} created.`,
@@ -41,19 +43,17 @@ const MESSAGES = {
 export function setFlash(res, code, arg = '') {
   if (!Object.hasOwn(MESSAGES, code)) throw new Error(`Unknown flash code: ${code}`);
   res.cookie(COOKIE, arg ? `${code}:${arg}` : code, {
-    path: COOKIE_PATH, httpOnly: true, sameSite: 'lax', maxAge: 30_000,
+    path: cookiePath(res), httpOnly: true, sameSite: 'lax', maxAge: 30_000,
   });
 }
 
 /** Read and immediately clear. A confirmation should not survive a refresh. */
 export function takeFlash(req, res) {
-  const raw = req.headers.cookie || '';
-  const entry = raw.split(';').map((s) => s.trim()).find((s) => s.startsWith(`${COOKIE}=`));
-  if (!entry) return '';
+  const value = readCookie(req, COOKIE);
+  if (!value) return '';
 
-  res.clearCookie(COOKIE, { path: COOKIE_PATH });
+  res.clearCookie(COOKIE, { path: cookiePath(res) });
 
-  const value = decodeURIComponent(entry.slice(COOKIE.length + 1));
   const separator = value.indexOf(':');
   const code = separator === -1 ? value : value.slice(0, separator);
   const arg = separator === -1 ? '' : value.slice(separator + 1);
