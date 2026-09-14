@@ -244,7 +244,7 @@
     </div>
     <!-- The preview is the real PDF, not a second HTML rendering of the same
          data. There is nothing here that can drift from what the client gets. -->
-    <iframe src="<%= u('/invoices/' + (invoice.id) + '/pdf#toolbar=0') %>" title="Invoice <%= invoice.id %>"
+    <iframe src="<%= u('/invoices/' + (invoice.id) + '/pdf#toolbar=0') %>" title="Invoice <%= invoice.id %>" data-pdf-preview
             class="h-[56.25rem] w-full rounded-lg border border-slate-800 bg-slate-900"></iframe>
   </section>
 <% } %>
