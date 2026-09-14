@@ -10,6 +10,11 @@
   The preview renders the saved record anyway, so a style change that did not
   save could not show the reader anything.
 
+  With JavaScript, public/js/invoice-editor.js sends that same save in the
+  background when nothing else in the form has changed, and swaps in a fresh
+  copy of this partial from the page the save returns, so the reader stays at
+  the preview. Without it, the plain submit described here is the whole story.
+
   A form submits only the button that was clicked, so an ordinary Save sends no
   style at all. src/routes/invoices.js falls back to the stored value rather
   than to a default for exactly that reason.

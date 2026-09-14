@@ -195,3 +195,80 @@
     e.returnValue = '';
   });
 })();
+
+/**
+ * Restyle without leaving the preview.
+ *
+ * The style buttons are submit buttons on the editor form (see
+ * src/views/partials/style-toggle.ejs). On their own, a click saves, the server
+ * redirects back to the editor, and the reload lands at the top of the page, a
+ * screen away from the preview the click was meant to change.
+ *
+ * Here the same POST is sent in the background and two things on the page are
+ * replaced. The toggle is taken from the page the redirect returns, so its
+ * markup stays the server's and none of its classes are copied into this file.
+ * The preview is pointed at the PDF again with a query value that changes every
+ * time, so the browser cannot answer from its cache.
+ *
+ * Only when restyling is the whole of what the save does. With unsaved edits in
+ * the form, the click falls back to the ordinary submit: that save can change
+ * the status, the client, the heading and the total, and refreshing only the
+ * preview would leave the page showing half the old record and half the new
+ * one. Any failure falls back the same way. A 422 has errors to show, and the
+ * ordinary submit is what renders them.
+ *
+ * The unsaved-changes guard above needs nothing from this. It compares the form
+ * to how it loaded, and this path runs only while those still match and leaves
+ * the form as it found it.
+ */
+(() => {
+  const form = document.querySelector('[data-invoice-form]');
+  const preview = document.querySelector('[data-pdf-preview]');
+  if (!form || !preview) return;
+
+  const snapshot = () => new URLSearchParams(new FormData(form)).toString();
+  const loaded = snapshot();
+  let busy = false;
+
+  // Delegated from the document, because each successful restyle replaces the
+  // buttons with the server's fresh copies.
+  document.addEventListener('click', async (e) => {
+    const button = e.target.closest(`button[name="style"][form="${form.id}"]`);
+    if (!button) return;
+    e.preventDefault();
+    if (busy || button.getAttribute('aria-pressed') === 'true') return;
+    if (snapshot() !== loaded) {
+      form.requestSubmit(button);
+      return;
+    }
+
+    const group = button.closest('[role="group"]');
+    busy = true;
+    group.setAttribute('aria-busy', 'true');
+    try {
+      const body = new URLSearchParams(new FormData(form));
+      body.set('style', button.value);
+      // The update route answers a good save with a redirect to the editor and
+      // a bad one with a 422, so a followed redirect is the success signal.
+      const res = await fetch(form.action, { method: 'POST', body });
+      if (!res.ok || !res.redirected) throw new Error(`Save answered ${res.status}`);
+
+      const page = new DOMParser().parseFromString(await res.text(), 'text/html');
+      const fresh = page.querySelector('[role="group"][aria-label="PDF style"]');
+      if (!fresh) throw new Error('No style toggle on the saved page');
+
+      const src = new URL(preview.src);
+      src.searchParams.set('v', Date.now());
+      group.replaceWith(fresh);
+      preview.src = src.href;
+      // The clicked button is gone with the old group. Without this a keyboard
+      // user is dropped back at the top of the document.
+      fresh.querySelector('[aria-pressed="true"]')?.focus();
+    } catch {
+      form.requestSubmit(button);
+    } finally {
+      busy = false;
+      group.removeAttribute('aria-busy');
+    }
+  });
+})();

@@ -147,6 +147,11 @@ test('the editor marks the saved style as the pressed one', async () => {
   // Submitting the editor rather than a form of its own is what keeps a style
   // change from discarding unsaved line-item edits.
   assert.match(body, /form="invoice-form" name="style"/);
+  // The hooks public/js/invoice-editor.js restyles in place through. Without
+  // either, a click silently reverts to the full reload.
+  assert.match(body, /<form[^>]*id="invoice-form"[^>]*data-invoice-form/s);
+  assert.match(body, /<iframe[^>]*data-pdf-preview/s);
+  assert.match(body, /role="group" aria-label="PDF style"/);
 });
 
 test('a sent, paid or void invoice shows its style as a disabled control', async () => {
