@@ -28,6 +28,7 @@
     "./schema": "./src/schema.js",
     "./money": "./src/money.js",
     "./markup": "./src/lib/markup.js",
+    "./import": "./src/import.js",
     "./pdf": "./src/lib/pdf/generate.js",
     "./fonts": "./src/lib/pdf/fonts.js",
     "./demo": "./src/demo.js",
@@ -62,6 +63,7 @@
     "css": "npx @tailwindcss/cli -i public/css/app.css -o public/css/dist/app.css --watch",
     "css:build": "npx @tailwindcss/cli -i public/css/app.css -o public/css/dist/app.css --minify",
     "seed": "node scripts/seed.mjs",
+    "import": "node scripts/import.mjs",
     "data:commit": "node scripts/data-commit.mjs",
     "test": "node --test \"test/*.test.js\""
   },
