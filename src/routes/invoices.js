@@ -1,7 +1,8 @@
 import express from 'express';
 import {
   makeInvoice, validateInvoice, invoiceTotals,
-  dueDateFor, today, TERMS, INVOICE_STATUSES, INVOICE_STYLES, withSnapshots, isOverdue, INVOICE_ID,
+  dueDateFor, today, TERMS, INVOICE_STATUSES, INVOICE_STYLES, styleId,
+  withSnapshots, isOverdue, INVOICE_ID,
 } from '../schema.js';
 import { parseCents, parseQuantity } from '../money.js';
 import { generateInvoicePdf } from '../lib/pdf/generate.js';
@@ -80,6 +81,12 @@ const invoiceFromForm = (body) => ({
  */
 const renderContext = async (store, invoice, errors = []) => ({
   invoice,
+  // The store hands back what is on disk, not a record through makeInvoice, so
+  // an invoice written before styles existed carries no `style` key. The PDF
+  // route survives that on styleFor's fallback; the toggle would compare every
+  // button against undefined and light none of them. Resolve the fallback here
+  // rather than in the template, so the view compares two real style ids.
+  currentStyle: styleId(invoice.style),
   totals: invoiceTotals(invoice),
   clients: await store.listClients(),
   vendors: await store.listVendors(),

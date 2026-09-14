@@ -228,7 +228,7 @@
     <div class="mb-3 flex items-center justify-between">
       <%- include('../partials/style-toggle', {
         styles: INVOICE_STYLES,
-        current: invoice.style,
+        current: currentStyle,
         frozen: invoice.status !== 'draft',
         form: 'invoice-form',
       }) %>
