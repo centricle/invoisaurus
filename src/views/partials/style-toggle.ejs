@@ -24,6 +24,17 @@
   drawn one way, and redrawing that invoice number another way turns one number
   into two different-looking documents.
 
+  Frozen, the buttons are still buttons, disabled, so the control reads as
+  unavailable rather than as two labels -- to a screen reader as much as to
+  the eye. They carry no `name` or `form` either. A disabled button is never
+  submitted anyway, and the route ignores a style on a non-draft regardless;
+  leaving them off means neither of those has to hold for the other to.
+
+  The tooltip and the not-allowed cursor sit on the group, and the buttons let
+  the pointer through to it. A disabled button receives no mouse events, and
+  some browsers show no `title` over one, so a tooltip on the buttons
+  themselves would appear in one browser and not another.
+
   Takes `styles`, `current`, `frozen`, and `form` (the id to submit).
 %>
 <% const shell = 'inline-flex rounded-md border border-slate-800 p-0.5'; %>
@@ -31,9 +42,11 @@
 <% const on = 'bg-slate-800 text-slate-100'; %>
 <% const off = 'text-slate-500 hover:text-slate-300'; %>
 <% if (frozen) { %>
-  <div class="<%= shell %>" role="group" aria-label="PDF style">
+  <% const reason = 'The style is locked once an invoice leaves draft, so this PDF keeps matching the one already sent.'; %>
+  <div class="<%= shell %> cursor-not-allowed" role="group" aria-label="PDF style" title="<%= reason %>">
     <% styles.forEach((s) => { %>
-      <span class="<%= cell %> <%= s.id === current ? on : 'text-slate-700' %>"><%= s.label %></span>
+      <button type="button" disabled aria-pressed="<%= s.id === current %>"
+              class="<%= cell %> pointer-events-none <%= s.id === current ? 'bg-slate-800/60 text-slate-400' : 'text-slate-700' %>"><%= s.label %></button>
     <% }) %>
   </div>
 <% } else { %>
