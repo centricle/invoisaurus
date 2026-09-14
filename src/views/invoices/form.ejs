@@ -39,7 +39,7 @@
 
 <%- include('../partials/errors') %>
 
-<form method="post" id="invoice-form" data-invoice-form
+<form method="post" id="invoice-form" data-invoice-form data-track-changes
       data-term-days='<%- JSON.stringify(termDays) %>'
       action="<%= u(isNew ? '/invoices' : `/invoices/${invoice.id}`) %>" class="space-y-8">
   <%- locals.csrfField?.() ?? '' %>
@@ -248,6 +248,12 @@
             class="h-[56.25rem] w-full rounded-lg border border-slate-800 bg-slate-900"></iframe>
   </section>
 <% } %>
+
+<%- include('../partials/save-bar', {
+  form: 'invoice-form',
+  label: isNew ? 'Create Invoice' : 'Save Changes',
+  discardHref: isNew ? '/invoices' : `/invoices/${invoice.id}`,
+}) %>
 
 <script src="<%= u('/js/invoice-editor.js') %>"></script>
 

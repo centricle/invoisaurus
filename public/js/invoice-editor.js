@@ -151,9 +151,10 @@
  * today -- NUMBER_PREFIX and INVOICE_ID in src/schema.js both exclude quotes --
  * which is exactly why this should not depend on that staying true.
  *
- * Registered before the unsaved-changes guard below, so canceling here stops
- * that guard from ever seeing the submit and concluding the page is on its way
- * out.
+ * This file loads as a regular script and public/js/unsaved.js is deferred, so
+ * this listener is registered before that one's. Canceling here stops the
+ * unsaved-changes guard from ever seeing the submit and concluding the page is
+ * on its way out.
  */
 (() => {
   const form = document.querySelector('[data-delete-invoice]');
@@ -164,35 +165,6 @@
     if (confirm(`Delete ${id}? The number will not be reused.`)) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-  });
-})();
-
-/**
- * Warn before navigating away from unsaved edits.
- *
- * Losing a half-built invoice to a stray click on the nav is the most annoying
- * failure this app can have, and the editor has no autosave to fall back on.
- * The snapshot is taken once the form has been parsed, so a server-rendered
- * value never counts as a change; submitting clears the guard so saving does
- * not trigger it.
- */
-(() => {
-  const form = document.querySelector('[data-invoice-form]');
-  if (!form) return;
-
-  const snapshot = () => new URLSearchParams(new FormData(form)).toString();
-  let saved = snapshot();
-  let submitting = false;
-
-  form.addEventListener('submit', () => { submitting = true; });
-  document.querySelectorAll('form').forEach((f) => {
-    if (f !== form) f.addEventListener('submit', () => { submitting = true; });
-  });
-
-  window.addEventListener('beforeunload', (e) => {
-    if (submitting || snapshot() === saved) return;
-    e.preventDefault();
-    e.returnValue = '';
   });
 })();
 
@@ -217,9 +189,9 @@
  * one. Any failure falls back the same way. A 422 has errors to show, and the
  * ordinary submit is what renders them.
  *
- * The unsaved-changes guard above needs nothing from this. It compares the form
- * to how it loaded, and this path runs only while those still match and leaves
- * the form as it found it.
+ * public/js/unsaved.js needs nothing from this. It compares the form to how it
+ * loaded, and this path runs only while those still match and leaves the form
+ * as it found it, so the save bar stays hidden through a restyle.
  */
 (() => {
   const form = document.querySelector('[data-invoice-form]');
