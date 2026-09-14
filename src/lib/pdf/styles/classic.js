@@ -24,7 +24,7 @@ const INK = rgb(0.08, 0.09, 0.11);
 const MUTED = rgb(0.42, 0.45, 0.5);
 const RULE = rgb(0.80, 0.82, 0.85);
 
-export default {
+export const classic = {
   id: 'classic',
 
   ink: INK,

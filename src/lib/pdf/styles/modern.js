@@ -61,7 +61,7 @@ const eyebrow = (string, at) => text(string, {
   ...at, size: MONO.eyebrow, tracking: TRACK.eyebrow, color: FAINT,
 });
 
-export default {
+export const modern = {
   id: 'modern',
 
   ink: INK,

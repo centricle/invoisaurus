@@ -7,9 +7,18 @@
  * addressLines and termById from schema.js, so a schema.js that imported this
  * back would close the cycle -- and it would drag pdf-lib into every route and
  * every test that touches a record. A test asserts the two agree.
+ *
+ * Named exports, not defaults, and that is load-bearing. Netlify's bundler
+ * transpiles the tree to CommonJS and resolves a default import of a local
+ * module in "node compatibility mode": the whole module namespace lands under
+ * `.default`, so `classic` arrived as `{ default: { embedFonts, ... } }` and
+ * every PDF in the deployed demo was a 500 reading `style.embedFonts is not a
+ * function`. The suite cannot see it, because nothing here is bundled under
+ * test. The same trap took out sausaging's airport table on 2026-09-10. A
+ * test in test/styles.test.js refuses any local default export for this reason.
  */
-import classic from './classic.js';
-import modern from './modern.js';
+import { classic } from './classic.js';
+import { modern } from './modern.js';
 
 export const STYLES = { classic, modern };
 
