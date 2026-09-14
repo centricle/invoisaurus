@@ -1,4 +1,7 @@
 import { test } from 'node:test';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 // Binds INVOISAURUS_DATA_DIR before config.js resolves it. See test/tmpdir.js.
 import './tmpdir.js';
@@ -245,4 +248,18 @@ test('Modern fits fewer rows on its first page than Classic', async () => {
   assert.ok(modern.pages[0].length < classic.pages[0].length,
     `Modern fits ${modern.pages[0].length} rows on page one, Classic ${classic.pages[0].length}`);
   assert.ok(CONTENT.width === 504, 'both styles are still laid out in the same content box');
+});
+
+test('no module under src/ has a default export', () => {
+  // Netlify's bundler transpiles ESM to CommonJS and resolves a default import
+  // of a local module as the module namespace, so `import x from './x.js'`
+  // arrives as `{ default: x }` once deployed and nowhere else. The styles
+  // shipped that way in 2.0.0 and every PDF in the demo was a 500 that the
+  // suite could not see. Named exports do not have the problem. See the header
+  // of src/lib/pdf/styles/index.js.
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'src');
+  const offenders = fs.readdirSync(root, { recursive: true })
+    .filter((f) => f.endsWith('.js'))
+    .filter((f) => /^export default\b/m.test(fs.readFileSync(path.join(root, f), 'utf8')));
+  assert.deepEqual(offenders, [], 'default exports do not survive the function bundler');
 });
