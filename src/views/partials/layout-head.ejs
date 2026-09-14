@@ -78,7 +78,9 @@
   </header>
   <main class="mx-auto max-w-5xl px-6 py-10">
     <% if (locals.flash) { %>
-      <p role="status"
+      <%# data-flash: public/js/unsaved.js removes this once the form is edited,
+          because the confirmation stops being true at that moment. %>
+      <p role="status" data-flash
          class="mb-6 rounded-md border border-emerald-900/60 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-300">
         <%= flash %>
       </p>

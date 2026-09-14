@@ -1,0 +1,37 @@
+<%#
+  The save bar: fixed to the bottom of the viewport while a form has unsaved
+  changes, so the state of the page is visible wherever it is scrolled to. A
+  long invoice puts both the heading and the form's own Save button off-screen,
+  which is exactly where an edit gets made and then forgotten.
+
+  Rendered hidden. public/js/unsaved.js shows it when the form stops matching
+  what the page loaded with, and hides it again if the edit is undone.
+
+  The button is a submit button reached by `form=`, so it sends exactly what the
+  form's own button sends. This partial is included after `</form>` on purpose:
+  implicit submission -- Enter in a text field -- picks the first submit button
+  in tree order that belongs to the form, and that has to stay the form's own.
+
+  Discard is a link, so it is plain navigation to the record as saved. Its
+  target comes from the server rather than from `location.href`: after a
+  rejected save the address bar holds the POST action, and `/clients/:id` and
+  `/vendors/:id` answer POST only. A new record has no saved state to return
+  to, so it discards to the list.
+
+  Takes `form` (the form id), `label` (the form's own submit label) and
+  `discardHref` (app-relative).
+%>
+<div data-save-bar hidden role="region" aria-label="Unsaved changes"
+     class="fixed inset-x-0 bottom-0 z-40 border-t border-amber-900/60 bg-slate-950">
+  <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-6 py-3">
+    <p role="status" class="flex items-center gap-2 text-sm text-amber-300">
+      <span aria-hidden="true" class="h-2 w-2 rounded-full bg-amber-400"></span>
+      Unsaved changes
+    </p>
+    <div class="flex items-center gap-4">
+      <a href="<%= u(discardHref) %>" data-discard class="text-sm text-slate-400 hover:text-slate-200">Discard</a>
+      <button type="submit" form="<%= form %>"
+              class="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500"><%= label %></button>
+    </div>
+  </div>
+</div>

@@ -439,11 +439,70 @@ test('a confirmation is shown once and does not survive a refresh', async () => 
   const cookie = res.headers.get('set-cookie').split(';')[0];
 
   const first = await fetch(`${base}/invoices/ACM-0001`, { headers: { cookie } });
-  assert.ok((await first.text()).includes('Invoice ACM-0001 created.'));
+  const firstBody = await first.text();
+  assert.ok(firstBody.includes('Invoice ACM-0001 created.'));
+  // The hook public/js/unsaved.js removes the banner through once the form is
+  // edited, so a stale confirmation cannot sit above unsaved work.
+  assert.match(firstBody, /<p role="status" data-flash/);
   assert.match(first.headers.get('set-cookie') || '', /flash=;/, 'the cookie is cleared on read');
 
   const again = await fetch(`${base}/invoices/ACM-0001`);
   assert.ok(!(await again.text()).includes('created.'), 'a refresh does not re-show it');
+});
+
+test('every form page renders a hidden save bar wired to its form', async () => {
+  const invoice = await seedInvoice();
+  const pages = [
+    [`/invoices/${invoice.id}`, 'invoice-form', 'Save Changes', `/invoices/${invoice.id}`],
+    [`/invoices/new?clientId=${client.id}`, 'invoice-form', 'Create Invoice', '/invoices'],
+    [`/clients/${client.id}/edit`, 'client-form', 'Save Changes', `/clients/${client.id}/edit`],
+    ['/clients/new', 'client-form', 'Create Client', '/clients'],
+    [`/vendors/${vendor.id}/edit`, 'vendor-form', 'Save Changes', `/vendors/${vendor.id}/edit`],
+    ['/vendors/new', 'vendor-form', 'Create Vendor', '/vendors'],
+  ];
+
+  for (const [url, id, label, discard] of pages) {
+    const res = await fetch(`${base}${url}`);
+    assert.equal(res.status, 200, url);
+    const body = await res.text();
+
+    const formAt = body.search(new RegExp(`<form[^>]*id="${id}"[^>]*data-track-changes`));
+    assert.ok(formAt !== -1, `${url}: the form opts in to change tracking`);
+    const barAt = body.indexOf('<div data-save-bar hidden');
+    assert.ok(barAt !== -1, `${url}: a save bar, hidden until there is something to save`);
+    // After the form closes, so Enter in a field still submits through the
+    // form's own button rather than the bar's.
+    assert.ok(barAt > body.indexOf('</form>', formAt), `${url}: the bar follows the form`);
+
+    const bar = body.slice(barAt);
+    assert.match(bar, new RegExp(`href="${discard.replace(/[?]/g, '\\?')}" data-discard`), `${url}: Discard goes to the saved record`);
+    assert.match(bar, new RegExp(`form="${id}"[^>]*>${label}</button>`), `${url}: Save submits the form, same label`);
+    assert.ok(!body.includes('data-form-errors'), `${url}: a clean page is not marked rejected`);
+  }
+});
+
+test('a rejected save marks the page as unsaved from the moment it loads', async () => {
+  // The server renders the refused input back into the form. It matches what
+  // the page loaded with, so a comparison alone would call it saved.
+  const invoice = await seedInvoice();
+  const responses = {
+    'new invoice': await post('/invoices', {
+      vendorId: vendor.id, clientId: client.id, issueDate: '2026-09-02', terms: 'net30',
+      status: 'draft', 'description[]': '', 'quantity[]': '1', 'rate[]': '150',
+    }),
+    'invoice edit': await post(`/invoices/${invoice.id}`, formFields(invoice, { 'description[]': '' })),
+    'new client': await post('/clients', { name: '', type: 'business' }),
+    'client edit': await post(`/clients/${client.id}`, { name: '', type: 'individual' }),
+    'new vendor': await post('/vendors', { name: '' }),
+    'vendor edit': await post(`/vendors/${vendor.id}`, { name: '' }),
+  };
+
+  for (const [what, res] of Object.entries(responses)) {
+    assert.equal(res.status, 422, what);
+    const body = await res.text();
+    assert.match(body, /data-form-errors/, `${what}: marked rejected`);
+    assert.match(body, /data-save-bar/, `${what}: with the bar there to show`);
+  }
 });
 
 test('a flash code the app did not write renders nothing', async () => {

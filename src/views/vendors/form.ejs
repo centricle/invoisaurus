@@ -6,7 +6,8 @@
 
 <%- include('../partials/errors') %>
 
-<form method="post" action="<%= u(isNew ? '/vendors' : `/vendors/${vendor.id}`) %>" class="max-w-2xl space-y-6">
+<form method="post" id="vendor-form" data-track-changes
+      action="<%= u(isNew ? '/vendors' : `/vendors/${vendor.id}`) %>" class="max-w-2xl space-y-6">
   <%- locals.csrfField?.() ?? '' %>
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
     <%- field('name', 'Company name', vendor.name, { className: 'sm:col-span-2' }) %>
@@ -51,5 +52,11 @@
     <a href="<%= u('/vendors') %>" class="text-sm text-slate-400 hover:text-slate-200">Cancel</a>
   </div>
 </form>
+
+<%- include('../partials/save-bar', {
+  form: 'vendor-form',
+  label: isNew ? 'Create Vendor' : 'Save Changes',
+  discardHref: isNew ? '/vendors' : `/vendors/${vendor.id}/edit`,
+}) %>
 
 <%- include('../partials/layout-foot') %>

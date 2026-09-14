@@ -133,6 +133,13 @@ textarea[data-autogrow] {
   color: rgb(148 163 184);
 }
 
+/* Room under the page for the save bar while it shows. It is fixed to the
+   viewport, so without this the last line of a form -- or the delete link under
+   an invoice -- sits behind it at the bottom of the scroll. */
+body:has([data-save-bar]:not([hidden])) main {
+  padding-bottom: 6rem;
+}
+
 .stepper {
   position: relative;
   display: block;
