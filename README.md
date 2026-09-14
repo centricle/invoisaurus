@@ -160,6 +160,7 @@ What is different from the normal app:
   including one that is overdue, so the list screen has something to show.
 - Generated PDFs carry a diagonal `DEMO` watermark. They are otherwise the real
   thing, produced from whatever you typed by the same code the local tool uses.
+  A void invoice carries `DEMO` and `VOID` both, stacked.
 - A banner and a `DEMO` badge appear on every page.
 
 Everything else is the same code. Every request carries the store its handlers
@@ -279,6 +280,13 @@ already issued alone. The style freezes when an invoice leaves draft, alongside
 the address blocks and for the same reason: the client already has a PDF drawn one
 way, and redrawing that invoice number another way turns one number into two
 different-looking documents.
+
+A void invoice still renders, in whichever style it was issued in, with `VOID`
+stamped diagonally across every page. The record stays, because a number that
+was issued has to stay accounted for, but a copy of the PDF that turns up in an
+inbox or a downloads folder should not read as money still owed. The stamp is
+drawn over the finished page and takes up no layout space, so a voided invoice
+paginates exactly as it did when it was sent.
 
 Modern embeds two faces of IBM Plex Mono, which live in `src/lib/pdf/fonts/` under
 the SIL Open Font License 1.1 (`OFL.txt` sits beside them). They are shipped
