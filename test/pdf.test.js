@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 // Binds INVOISAURUS_DATA_DIR before config.js resolves it. See test/tmpdir.js.
 import './tmpdir.js';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { generateInvoicePdf, planPages, embedFonts } from '../src/lib/pdf/generate.js';
+import { generateInvoicePdf, planPages, embedFonts, marksFor } from '../src/lib/pdf/generate.js';
 import { makeInvoice, snapshotClient, snapshotVendor, makeClient, makeVendor } from '../src/schema.js';
 import { sanitize, CONTENT, COLUMNS, META, SIZE } from '../src/lib/pdf/layout.js';
 import { layoutBlocks } from '../src/lib/pdf/richtext.js';
@@ -381,6 +381,45 @@ test('every page of a multi-page demo invoice is watermarked', async () => {
 
   const marks = pdfStrings(bytes).filter((t) => t === 'DEMO').length;
   assert.equal(marks, pageCount);
+});
+
+test('a void invoice is stamped VOID on every page, and nothing else is', async () => {
+  const items = Array.from({ length: 40 }, (_, i) => line(`Item ${i + 1}`));
+  for (const status of ['draft', 'sent', 'paid']) {
+    const strings = pdfStrings(await generateInvoicePdf(invoiceWith(items, { status })));
+    assert.ok(!strings.includes('VOID'), `a ${status} invoice must not carry it`);
+  }
+
+  const bytes = await generateInvoicePdf(invoiceWith(items, { status: 'void' }));
+  const pageCount = (await PDFDocument.load(bytes)).getPageCount();
+  assert.ok(pageCount > 1, 'the fixture should span pages');
+  assert.equal(pdfStrings(bytes).filter((t) => t === 'VOID').length, pageCount);
+});
+
+test('the VOID stamp does not move a single row', async () => {
+  const items = Array.from({ length: 16 }, (_, i) => line(`Item ${i + 1}`));
+  const sent = pdfStrings(await generateInvoicePdf(invoiceWith(items, { status: 'sent' })));
+  const voided = pdfStrings(await generateInvoicePdf(invoiceWith(items, { status: 'void' })));
+  assert.deepEqual(voided.filter((t) => t !== 'VOID'), sent);
+});
+
+test('a void invoice in the demo carries both marks', async () => {
+  const invoice = invoiceWith([line('Consulting')], { status: 'void' });
+  const texts = (options) => marksFor(invoice, options).map((m) => m.text);
+  assert.deepEqual(texts({ watermark: true }), ['DEMO', 'VOID']);
+  assert.deepEqual(texts({}), ['VOID']);
+
+  // Read back from Classic only: pdfStrings cannot decode the embedded face
+  // Modern stamps in (see test/pdftext.js), so the list above is the check
+  // that holds for every style.
+  const strings = pdfStrings(await generateInvoicePdf(invoice, { watermark: true }));
+  assert.deepEqual(strings.filter((t) => t === 'DEMO' || t === 'VOID'), ['DEMO', 'VOID']);
+});
+
+test('a Modern void invoice still renders', async () => {
+  const invoice = invoiceWith([line('Consulting')], { status: 'void', style: 'modern' });
+  const doc = await PDFDocument.load(await generateInvoicePdf(invoice, { watermark: true }));
+  assert.equal(doc.getPageCount(), 1);
 });
 
 test('bold and italic reach the page in different faces', async () => {
