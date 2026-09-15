@@ -1,6 +1,6 @@
 {
   "name": "invoisaurus",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Invoice generator. Web UI in, PDF out. Runs locally on JSON files, or as a package inside a host of your own.",
   "license": "AGPL-3.0-only",
   "author": "Kevin Smith <ksmith@centricle.com> (https://centricle.com)",
