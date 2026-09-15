@@ -26,6 +26,7 @@ import {
 import { field, statusBadgeClass } from './viewHelpers.js';
 import { ejsEngine } from './viewEngine.js';
 import { takeFlash } from './flash.js';
+import { readTheme } from './theme.js';
 import { createCsrf } from './csrf.js';
 import { clientsRouter } from './routes/clients.js';
 import { vendorsRouter } from './routes/vendors.js';
@@ -129,6 +130,8 @@ export function createApp({
       ? req.path.slice(base.length) || '/'
       : req.path;
     res.locals.flash = takeFlash(req, res);
+    // The reader's light/dark choice, or '' to follow the OS. See src/theme.js.
+    res.locals.theme = readTheme(req);
 
     // Redirects are prefixed here rather than at each of the eight call sites.
     // A handler saying `res.redirect('/invoices')` means the invoice list, and

@@ -517,6 +517,83 @@ test('a flash code the app did not write renders nothing', async () => {
   }
 });
 
+test('a theme cookie sets data-theme on the html tag', async () => {
+  // Matched against the <html ...> tag specifically, not the body at large --
+  // the word "light" or "dark" could otherwise turn up anywhere in the page
+  // (a style name, a flash message) and pass for the wrong reason.
+  for (const theme of ['light', 'dark']) {
+    const body = await (await fetch(`${base}/invoices`, { headers: { cookie: `theme=${theme}` } })).text();
+    const html = /<html[^>]*>/.exec(body)[0];
+    assert.equal(html, `<html lang="en" class="h-full" data-theme="${theme}">`);
+  }
+});
+
+test('no theme cookie renders the html tag with no data-theme', async () => {
+  const body = await (await fetch(`${base}/invoices`)).text();
+  const html = /<html[^>]*>/.exec(body)[0];
+  assert.equal(html, '<html lang="en" class="h-full">');
+  assert.ok(!html.includes('data-theme'));
+});
+
+test('an unrecognized theme cookie renders no attribute and cannot inject markup', async () => {
+  // The cookie value is decoded and rendered into an attribute. EJS escapes it,
+  // but the allowlist in src/theme.js is what decides that only `light` or
+  // `dark` reaches the page at all -- the theme cookie's version of the flash
+  // test above.
+  const attempts = [
+    'theme=blue',
+    // decodeURIComponent turns this into `"><script>alert(1)</script>`, which
+    // would close the attribute and open a script tag if the value were ever
+    // trusted enough to render unescaped.
+    'theme=%22%3E%3Cscript%3Ealert(1)%3C%2Fscript%3E',
+  ];
+  for (const cookie of attempts) {
+    const body = await (await fetch(`${base}/invoices`, { headers: { cookie } })).text();
+    const html = /<html[^>]*>/.exec(body)[0];
+    assert.ok(!html.includes('data-theme'), `${cookie}: no data-theme attribute`);
+    assert.ok(!body.includes('<script>alert(1)'), `${cookie}: no script tag reached the page`);
+  }
+});
+
+test('a cookie that cannot be percent-decoded does not take the page down', async () => {
+  // The theme cookie is read on every page, including this one. `%E0%A4%A` is
+  // a truncated UTF-8 sequence that makes decodeURIComponent throw, so a
+  // reader with a mangled cookie -- a browser bug, a hand-edited devtools
+  // value -- would otherwise get a 500 on every page until it expired.
+  const res = await fetch(`${base}/invoices`, { headers: { cookie: 'theme=%E0%A4%A' } });
+  assert.equal(res.status, 200);
+  const html = /<html[^>]*>/.exec(await res.text())[0];
+  assert.ok(!html.includes('data-theme'));
+});
+
+test('the page renders a theme switch outside the header, with the state a cookie implies', async () => {
+  const noCookie = await (await fetch(`${base}/invoices`)).text();
+  const button = /<button[^>]*data-theme-toggle[^>]*>/.exec(noCookie);
+  assert.ok(button, 'public/js/theme.js finds the switch by data-theme-toggle');
+  // Attributes checked individually rather than as one fixed string, so the
+  // test does not depend on the order they are written in the template.
+  assert.match(button[0], /role="switch"/);
+  assert.match(button[0], /type="button"/, 'not a submit button, so it never posts a form');
+  assert.match(button[0], /aria-label="Light theme"/, 'names what "on" means; aria-checked carries the state');
+  // The script scopes the cookie it writes to this path. It comes from the
+  // app's mount point, so an app served under a prefix does not set a cookie
+  // for the whole site around it; this test app has no prefix, hence '/'.
+  assert.match(button[0], /data-cookie-path="\/"/);
+
+  const headerEnd = noCookie.indexOf('</header>') + '</header>'.length;
+  assert.ok(headerEnd > '</header>'.length, 'sanity check: found </header> in the page');
+  assert.ok(
+    noCookie.slice(headerEnd).includes('data-theme-toggle'),
+    'the switch comes after </main>, last in tab order, not inside the header nav',
+  );
+
+  for (const [cookie, checked] of [['theme=light', 'true'], ['theme=dark', 'false'], ['', 'false']]) {
+    const body = await (await fetch(`${base}/invoices`, { headers: cookie ? { cookie } : {} })).text();
+    const b = /<button[^>]*data-theme-toggle[^>]*>/.exec(body)[0];
+    assert.match(b, new RegExp(`aria-checked="${checked}"`), `cookie ${JSON.stringify(cookie)}`);
+  }
+});
+
 test('a multi-line description survives the round trip to the PDF', async () => {
   await post('/invoices', {
     vendorId: vendor.id,

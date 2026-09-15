@@ -20,7 +20,12 @@
  * What follows from unsaved:
  *
  *   - The save bar (src/views/partials/save-bar.ejs) shows, pinned to the
- *     bottom of the viewport, and hides again when the form matches.
+ *     bottom of the viewport, and hides again when the form matches. The
+ *     theme switch (bottom right) rides up clear of it: this script keeps
+ *     --save-bar-offset on the root equal to the bar's measured height, which
+ *     app.css reads to push the switch by the same amount. Measured rather
+ *     than a constant because the bar's height depends on the root font size
+ *     and on wrapping at narrow widths.
  *   - The flash goes, and stays gone. "Invoice saved." was true of the moment
  *     after the save; left on screen above an edit made since, it tells someone
  *     coming back to the page that work is on disk when it is not.
@@ -39,11 +44,19 @@
   let dirty = false;
   let leaving = false;
 
+  // Read from the bar itself: it takes no space while hidden, and its
+  // height while shown depends on the root font size and on wrapping at
+  // narrow widths, neither of which is worth duplicating as a constant.
+  const placeSwitch = () => document.documentElement.style.setProperty(
+    '--save-bar-offset', bar && !bar.hidden ? `${bar.offsetHeight}px` : '0px',
+  );
+
   const update = () => {
     const next = rejected || snapshot() !== loaded;
     if (next === dirty) return;
     dirty = next;
     if (bar) bar.hidden = !dirty;
+    placeSwitch();
     if (dirty) document.querySelector('[data-flash]')?.remove();
   };
 
@@ -51,6 +64,7 @@
   form.addEventListener('change', update);
   // Adding or removing a line changes the fields without firing an input event.
   new MutationObserver(update).observe(form, { childList: true, subtree: true });
+  if (bar) new ResizeObserver(placeSwitch).observe(bar);
   update();
 
   // Any form's submit is a deliberate way off the page: this one saving, or
