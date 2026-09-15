@@ -264,6 +264,21 @@ the page carried in a hidden field, from a cookie another site cannot read. A
 request that fails gets a page explaining what to do, not a silent save of
 nothing. `src/csrf.js` has the mechanism.
 
+### Light and dark
+
+The interface has a light theme and a dark one. On a first visit it follows the
+operating system's setting. The switch at the bottom right of the screen (moon
+on the left for dark, sun on the right for light) switches to the other theme
+and remembers the choice in a `theme` cookie, which the server reads so the
+next page arrives in that theme instead of painting the other one first. The
+PDF is not themed: an invoice prints the same whichever theme it was previewed
+in.
+
+The light theme is not a second set of classes in the templates.
+`public/css/app.css` redefines Tailwind's color variables with `light-dark()`,
+so a class like `bg-slate-950` is the page background in both themes, and
+`test/theme.test.js` fails if a template uses a color that has no light value.
+
 ### Two styles
 
 Every invoice is drawn in one of two styles, chosen per invoice from the buttons
