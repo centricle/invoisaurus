@@ -605,7 +605,8 @@ body:has([data-save-bar]:not([hidden])) main {
   color: var(--color-on-accent);
 }
 
+/* The chevrons are square 24x24 icons, so the box is square. */
 .stepper-buttons svg {
-  width: 0.6rem;
-  height: 0.45rem;
+  width: 0.55rem;
+  height: 0.55rem;
 }

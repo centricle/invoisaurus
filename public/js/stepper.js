@@ -7,12 +7,19 @@
  *
  * Stepping is done arithmetically rather than through `stepUp()`/`stepDown()`,
  * which frees the input from having to declare a matching `step`. A real `step`
- * would make the browser reject anything off the grid — billing 0.1 hours
- * against `step="0.25"` fails validation on submit — and `step="any"`, which
+ * would make the browser reject anything off the grid -- billing 0.1 hours
+ * against `step="0.25"` fails validation on submit -- and `step="any"`, which
  * avoids that, is exactly what `stepUp()` throws on. Quantity inputs therefore
  * carry `step="any"`; the rest leave `step` unset and take the default of 1.
  */
 (() => {
+  // Lucide's chevron-up and chevron-down paths, drawn the same way as the
+  // icon partials (24x24 viewBox, currentColor stroke, round caps and joins).
+  // They are strings because this markup is built in JS, not rendered by the
+  // server.
+  const CHEVRON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>';
+  const CHEVRON_DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+
   const round = (value, decimals) => Number(value.toFixed(decimals));
 
   function attach(input) {
@@ -27,12 +34,8 @@
     const buttons = document.createElement('div');
     buttons.className = 'stepper-buttons';
     buttons.innerHTML = `
-      <button type="button" data-step="1" tabindex="-1" aria-label="Increase ${input.name}">
-        <svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 5l4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <button type="button" data-step="-1" tabindex="-1" aria-label="Decrease ${input.name}">
-        <svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>`;
+      <button type="button" data-step="1" tabindex="-1" aria-label="Increase ${input.name}">${CHEVRON_UP}</button>
+      <button type="button" data-step="-1" tabindex="-1" aria-label="Decrease ${input.name}">${CHEVRON_DOWN}</button>`;
     wrap.appendChild(buttons);
 
     buttons.addEventListener('click', (e) => {

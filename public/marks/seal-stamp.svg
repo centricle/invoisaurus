@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240" role="img" aria-label="Invoisaurus seal, stamped">
+  <!-- Generated output -- edit the generator, not this file. -->
+  <style>svg{--ink:#16150F;--paper:#F4F2EC}</style>
+  <defs>
+  <filter id="stamp" x="-15%" y="-15%" width="130%" height="130%" color-interpolation-filters="sRGB">
+    <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -0.34 -0.33 -0.33 1 0" result="shape"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.008" numOctaves="3" seed="123" result="warp"/>
+    <feDisplacementMap in="shape" in2="warp" scale="0" xChannelSelector="R" yChannelSelector="G" result="wobbly"/>
+    <feGaussianBlur in="wobbly" stdDeviation="1.15" result="g1"/>
+    <feComponentTransfer in="g1" result="t1"><feFuncA type="linear" slope="14" intercept="-6.654"/></feComponentTransfer>
+    <feGaussianBlur in="t1" stdDeviation="0" result="g2"/>
+    <feComponentTransfer in="g2" result="t2"><feFuncA type="linear" slope="14" intercept="-6.948"/></feComponentTransfer>
+    <feTurbulence type="fractalNoise" baseFrequency="0.48" numOctaves="3" seed="717" result="grain"/>
+    <feComponentTransfer in="grain" result="speck"><feFuncA type="linear" slope="9" intercept="-7.294"/></feComponentTransfer>
+    <feComposite in="t2" in2="speck" operator="out" result="stamped"/>
+    <feGaussianBlur in="stamped" stdDeviation="0.45" result="soft"/>
+    <feFlood style="flood-color:var(--ink)" result="ink"/>
+    <feComposite in="ink" in2="soft" operator="in"/>
+  </filter>
+  </defs>
+  <g filter="url(#stamp)"><circle cx="120" cy="126" r="96" fill="none" stroke="#000" stroke-width="12"/><g transform="translate(26,8) scale(0.78)"><g fill="#000" stroke="#fff" stroke-width="11.75" stroke-linejoin="miter" paint-order="stroke"><polygon points="56,118 60,90 72,80 88,94 90,106"/><polygon points="86,102 92,62 108,50 126,66 128,94"/><polygon points="118,94 124,48 142,34 162,52 166,94"/><polygon points="156,96 164,58 180,50 194,72 194,112"/><polygon points="188,114 198,92 210,90 214,110 212,124"/><polygon points="196,118 206,90 214,126"/><polygon points="216,128 238,108 232,146"/></g><g fill="#000"><polygon points="12,150 18,134 36,126 58,124 62,146 44,156 20,156"/><polygon points="52,146 56,126 78,106 106,94 132,90 158,96 178,114 182,146 152,166 96,168 66,160"/><polygon points="166,106 208,124 234,150 220,164 190,156 168,152"/><polygon points="196,118 206,90 214,126"/><polygon points="216,128 238,108 232,146"/><polygon points="62,150 92,150 90,194 64,194"/><polygon points="132,152 170,152 170,194 136,194"/><polygon points="56,118 60,90 72,80 88,94 90,106"/><polygon points="86,102 92,62 108,50 126,66 128,94"/><polygon points="118,94 124,48 142,34 162,52 166,94"/><polygon points="156,96 164,58 180,50 194,72 194,112"/><polygon points="188,114 198,92 210,90 214,110 212,124"/></g><g stroke="#fff" stroke-width="6.075" fill="none"><line x1="60" y1="124" x2="64" y2="150"/><line x1="62" y1="150" x2="92" y2="150"/><line x1="132" y1="152" x2="170" y2="152"/><line x1="72" y1="82" x2="80" y2="106"/><line x1="108" y1="52" x2="116" y2="94"/><line x1="142" y1="36" x2="152" y2="94"/><line x1="180" y1="52" x2="184" y2="112"/><line x1="210" y1="92" x2="206" y2="120"/></g><g fill="#fff"><polygon points="24,138 36,135 33,145"/></g></g></g>
+</svg>

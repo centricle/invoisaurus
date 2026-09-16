@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %> · Invoisaurus</title>
   <link rel="icon" href="<%= u('/favicon.svg') %>" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="<%= u('/apple-touch-icon.png') %>">
+  <link rel="icon" type="image/png" href="<%= u('/apple-touch-icon.png') %>" sizes="180x180">
   <link rel="stylesheet" href="<%= u('/css/dist/app.css') %>">
 </head>
 <body class="h-full bg-paper text-ink antialiased">
@@ -40,14 +42,8 @@
   <% } %>
   <header class="border-b border-rule">
     <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-      <a href="<%= u('/') %>" class="flex items-center gap-2 text-sm font-semibold tracking-tight text-ink">
-        <!-- Inlined rather than <img src="<%= u('/favicon.svg') %>">, so the mark inherits
-             currentColor and sizes in rem alongside the root scale. -->
-        <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 14h6" /><path d="M4 2h10" />
-          <rect x="4" y="18" width="16" height="4" rx="1" /><rect x="4" y="6" width="16" height="4" rx="1" />
-        </svg>
+      <a href="<%= u('/') %>" class="flex items-center gap-2 font-display text-lg font-medium tracking-tight text-ink">
+        <%- include('marks/stego', { class: 'h-6 w-6' }) %>
         Invoisaurus
         <% if (locals.badge) { %>
           <span class="rounded bg-warn/15 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-warn"><%= badge %></span>
