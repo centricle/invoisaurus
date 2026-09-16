@@ -121,3 +121,18 @@ test('at least 8 distinct semantic color utilities are used across the views', (
   // vacuously, so this asserts that it finds something.
   assert.ok(found.size >= 8, `expected at least 8 distinct semantic color utilities, found ${found.size}: ${[...found].join(', ')}`);
 });
+
+test('every @font-face src resolves from where the built stylesheet is served', () => {
+  // app.css is compiled to public/css/dist/app.css and served from there, so
+  // a relative url() in a @font-face rule is resolved by the browser against
+  // /css/dist/. The Tailwind CLI copies the string through as written, so a
+  // path such as "../fonts/" would point at /css/fonts/, which does not exist.
+  // Pages would fall back to Georgia while the preload tags (an absolute
+  // path) fetched the real files for nothing.
+  const css = fs.readFileSync(APP_CSS, 'utf8');
+  const urls = [...css.matchAll(/url\("([^"]+\.woff2)"\)/g)].map((m) => m[1]);
+  assert.ok(urls.length >= 7, `expected at least 7 font urls, found ${urls.length}`);
+  const dist = path.join(root, '..', 'public', 'css', 'dist');
+  const missing = urls.filter((u) => !fs.existsSync(path.resolve(dist, u)));
+  assert.deepEqual(missing, [], `font urls that do not resolve from public/css/dist: ${missing.join(', ')}`);
+});

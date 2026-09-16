@@ -518,3 +518,6 @@ the license is for.
 
 IBM Plex Mono, in `src/lib/pdf/fonts/`, is licensed separately under the
 [SIL Open Font License 1.1](./src/lib/pdf/fonts/OFL.txt) and is shipped unmodified.
+The interface's web fonts in `public/fonts/` (Fraunces, Alegreya Sans and IBM
+Plex Mono) are also under the OFL 1.1, with each license file beside the fonts;
+see [`public/fonts/LICENSES.md`](./public/fonts/LICENSES.md).

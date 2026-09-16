@@ -65,6 +65,7 @@
     "seed": "node scripts/seed.mjs",
     "import": "node scripts/import.mjs",
     "data:commit": "node scripts/data-commit.mjs",
+    "fonts": "node scripts/fonts.mjs",
     "test": "node --test \"test/*.test.js\""
   },
   "dependencies": {
@@ -76,7 +77,9 @@
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.18",
-    "concurrently": "^10.0.5"
+    "concurrently": "^10.0.5",
+    "fflate": "0.8.3",
+    "subset-font": "2.7.0"
   },
   "engines": {
     "node": ">=22.6.0"
