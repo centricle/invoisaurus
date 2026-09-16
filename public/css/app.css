@@ -1,57 +1,26 @@
 @import "tailwindcss";
 
 /*
- * Light mode, without renaming a single class.
+ * Semantic color tokens.
  *
- * The app was built dark-only: every template already reaches for
- * `bg-slate-950` as the page ground, `bg-slate-900` for inputs, `text-slate-400`
- * for labels, tinted badges like `bg-emerald-950/70 text-emerald-300`, and so
- * on. Adding a light theme by renaming those classes across every view would
- * touch hundreds of call sites for no functional gain, so instead the classes
- * keep their names and stop meaning a fixed color -- `bg-slate-950` now means
- * "the page ground," and which physical color that is depends on the theme.
- * That is the trade: templates stay untouched, but a class name like
- * `slate-950` no longer tells you, by itself, whether it is near-black or
- * near-white.
+ * Every color below is a role -- paper, plate, ink, rule, muted, faint,
+ * accent, ok, warn, danger -- not a Tailwind palette shade. `light-dark()` is
+ * the theming mechanism: each token carries a light value and a dark value,
+ * and the browser picks between them from the element's used `color-scheme`.
+ * `color-scheme: light dark` on `:root` (below) follows the OS with no
+ * `data-theme` set; the `data-theme="light"`/`"dark"` rules pin one value
+ * once the reader picks dark or light with the footer theme control (see
+ * public/js/theme.js), which forces every `light-dark()` in this file to
+ * resolve the same way regardless of the OS setting. Choosing system removes
+ * `data-theme`.
  *
- * The mechanism is the CSS `light-dark()` function. Tailwind 4 compiles every
- * palette color to a `--color-<name>-<shade>` custom property that its
- * utilities read (an opacity modifier like `bg-slate-900/70` runs that
- * variable through `color-mix()`, it does not bypass it), so redefining the
- * variable once here changes every utility built on it, with no per-template
- * or per-component copy. `light-dark(A, B)` picks `A` when the element's used
- * `color-scheme` is `light` and `B` when it is `dark`; it re-evaluates
- * automatically, so this is one definition per shade rather than a light
- * block and a `@media (prefers-color-scheme: dark)` block kept in sync by
- * hand. `color-scheme: light dark` on `:root` below means that, with no
- * `data-theme` attribute set, the choice follows the OS -- the attribute
- * rules (the server renders the attribute once the reader picks a theme with
- * the header toggle; see src/theme.js) each pin `color-scheme` to one value, which forces every `light-dark()` in the
- * file to resolve the same way regardless of the OS setting. `color-scheme`
- * also governs native browser chrome -- the date picker icon, scrollbars,
- * `<select>` popups -- so those follow the theme too, for free.
- *
- * The mirror rule: for a flipped shade `n`, its light value is the *default*
- * value of shade `1000 - n` (950 <-> 50, 900 <-> 100, 800 <-> 200, 700 <-> 300,
- * 600 <-> 400), and its dark value stays its own default. That keeps contrast
- * roughly symmetric across the flip -- the palette step that was near-black at
- * the bottom of the dark scale becomes the near-white step at the top of the
- * light one. 500 sits in the middle of every Tailwind scale, so it mirrors to
- * itself and normally needs no line -- slate-500 is the exception, covered
- * below, where the mirror value fell short of contrast and got adjusted.
- *
- * Two colors are deliberately not flipped: `sky-500` and `sky-600` (the
- * primary button's background, its hover state, and focus borders) and
- * `white` (text on those buttons). Both were chosen to read correctly against
- * either a dark or a light page ground already, so flipping them would just
- * make the primary button change color when the theme does, for no benefit.
- *
- * This list has to be maintained by hand: Tailwind has no way to know which
- * shades are "flipped" versus "fixed," so a template reaching for a new
- * palette-shade combination (say `bg-indigo-700`) gets its plain dark-mode
- * default on a light page unless a line for it is added here first.
- * `test/theme.test.js` checks the templates against this file's coverage and
- * fails when one drifts ahead of the other.
+ * A consumer restyles this engine by declaring these same `@theme` variable
+ * names after importing this file -- a token edit, not a hunt through every
+ * view for a class to rename. `test/theme.test.js` forbids a Tailwind palette
+ * utility (a fixed color name and shade number, such as `bg-slate-900`)
+ * anywhere under src/views, public/js and the top-level src/*.js files, so a
+ * view can only reach for a token that has a light and a dark value defined
+ * here.
  */
 
 :root {
@@ -67,54 +36,147 @@
 }
 
 @theme {
-  --color-slate-50: light-dark(oklch(12.9% 0.042 264.695), oklch(98.4% 0.003 247.858));
-  --color-slate-100: light-dark(oklch(20.8% 0.042 265.755), oklch(96.8% 0.007 247.896));
-  --color-slate-200: light-dark(oklch(27.9% 0.041 260.031), oklch(92.9% 0.013 255.508));
-  --color-slate-300: light-dark(oklch(37.2% 0.044 257.287), oklch(86.9% 0.022 252.894));
-  --color-slate-400: light-dark(oklch(44.6% 0.043 257.281), oklch(70.4% 0.04 256.788));
-  /* 500 mirrors to itself under the rule above, so it normally needs no line
-     -- this one exists because the dusty light page below lowered hint text
-     (text-slate-500) to 4.1:1, under the 4.5:1 minimum for body text.
-     Darkened a few steps in light only, it measures 4.63:1 on the page and
-     5.11:1 on a field, still lighter than labels (text-slate-400, 6.5:1) so
-     hints stay quieter than labels. Dark is unchanged. */
-  --color-slate-500: light-dark(oklch(52.4% 0.046 257.417), oklch(55.4% 0.046 257.417));
-  --color-slate-600: light-dark(oklch(70.4% 0.04 256.788), oklch(44.6% 0.043 257.281));
-  /* slate-700 through slate-950 (borders, fields, page) deliberately depart
-     from the mirror rule above. A near-white page glared in a well-lit room,
-     so the light page is a dusty blue rather than near-white, and fields sit
-     brighter than the page rather than darker -- the way a card lifts off a
-     surface, not the way a shadow sits on it. The text steps above still
-     follow the mirror. */
-  --color-slate-700: light-dark(oklch(82% 0.03 254), oklch(37.2% 0.044 257.287));
-  --color-slate-800: light-dark(oklch(87.8% 0.022 254), oklch(27.9% 0.041 260.031));
-  --color-slate-900: light-dark(oklch(98% 0.005 250), oklch(20.8% 0.042 265.755));
-  --color-slate-950: light-dark(oklch(94.6% 0.014 252), oklch(12.9% 0.042 264.695));
+  --color-paper: light-dark(oklch(96.1% 0.008 91.5), oklch(18.7% 0.004 84.6));   /* page ground */
+  --color-plate: light-dark(oklch(98.5% 0.005 95.1), oklch(21.8% 0.006 91.6));   /* card, field, popover */
+  --color-ink:   light-dark(oklch(19.5% 0.012 99.5), oklch(93.1% 0.017 91.6));   /* text */
+  --color-rule:  light-dark(oklch(84.2% 0.018 92.7), oklch(34.3% 0.017 97.9));   /* borders, dividers */
+  --color-muted: light-dark(oklch(51.6% 0.019 95.4), oklch(69.5% 0.025 96.1));   /* labels, secondary text */
+  /* Hint text and anything else that has to stay quieter than a label but
+     still clear 4.5:1. Plain `muted/70` (an alpha mix) measures under 4.5:1
+     on both paper and plate, in both themes, so this is its own solid token
+     rather than an opacity modifier on muted. */
+  --color-faint: light-dark(oklch(53.0% 0.019 95.4), oklch(62.0% 0.025 96.1));
+  --color-accent: light-dark(oklch(36.7% 0.068 263.7), oklch(76.0% 0.079 254.7)); /* links, primary action, focus */
+  --color-on-accent: light-dark(oklch(98.5% 0.005 95.1), oklch(18.7% 0.004 84.6)); /* text on an accent fill */
+  --color-ok:     light-dark(oklch(45% 0.12 160), oklch(80% 0.14 160));
+  --color-warn:   light-dark(oklch(50% 0.13 60),  oklch(85% 0.15 85));
+  --color-danger: light-dark(oklch(48% 0.19 27),  oklch(75% 0.16 22));
+  --font-display: "Fraunces", Georgia, ui-serif, serif;
+  --font-sans: "Alegreya Sans", "Gill Sans", "Segoe UI", ui-sans-serif, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
 
-  --color-sky-300: light-dark(oklch(50% 0.134 242.749), oklch(82.8% 0.111 230.318));
-  /* One step past the mirror: sky-400 is link and accent text, and its mirror
-     (sky-600) measures 3.8:1 on the light page, under the 4.5:1 text minimum.
-     sky-700 clears it. */
-  --color-sky-400: light-dark(oklch(50% 0.134 242.749), oklch(74.6% 0.16 232.661));
-  --color-sky-800: light-dark(oklch(90.1% 0.058 230.902), oklch(44.3% 0.11 240.79));
-  --color-sky-950: light-dark(oklch(97.7% 0.013 236.62), oklch(29.3% 0.066 243.157));
+/*
+ * Components.
+ *
+ * The handful of patterns that repeat three or more times across the views --
+ * buttons, fields, cards, segmented controls -- get one class each instead of
+ * a run of utilities copied at every call site. Everything here is built on
+ * the tokens above; layout (width, margin, flex placement) stays a utility on
+ * the element, not part of the component.
+ */
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    border: 1px solid transparent;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
 
-  --color-emerald-300: light-dark(oklch(50.8% 0.118 165.612), oklch(84.5% 0.143 164.978));
-  --color-emerald-800: light-dark(oklch(90.5% 0.093 164.15), oklch(43.2% 0.095 166.913));
-  --color-emerald-900: light-dark(oklch(95% 0.052 163.051), oklch(37.8% 0.077 168.94));
-  --color-emerald-950: light-dark(oklch(97.9% 0.021 166.113), oklch(26.2% 0.051 172.552));
+  .btn:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
 
-  --color-amber-200: light-dark(oklch(47.3% 0.137 46.201), oklch(92.4% 0.12 95.746));
-  --color-amber-300: light-dark(oklch(55.5% 0.163 48.998), oklch(87.9% 0.169 91.605));
-  --color-amber-400: light-dark(oklch(66.6% 0.179 58.318), oklch(82.8% 0.189 84.429));
-  --color-amber-800: light-dark(oklch(92.4% 0.12 95.746), oklch(47.3% 0.137 46.201));
-  --color-amber-900: light-dark(oklch(96.2% 0.059 95.617), oklch(41.4% 0.112 45.904));
-  --color-amber-950: light-dark(oklch(98.7% 0.022 95.277), oklch(27.9% 0.077 45.635));
+  .btn:disabled {
+    opacity: 0.5;
+  }
 
-  --color-red-300: light-dark(oklch(50.5% 0.213 27.518), oklch(80.8% 0.114 19.571));
-  --color-red-400: light-dark(oklch(57.7% 0.245 27.325), oklch(70.4% 0.191 22.216));
-  --color-red-900: light-dark(oklch(93.6% 0.032 17.717), oklch(39.6% 0.141 25.723));
-  --color-red-950: light-dark(oklch(97.1% 0.013 17.38), oklch(25.8% 0.092 26.042));
+  .btn-primary {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  .btn-primary:hover {
+    background: color-mix(in oklab, var(--color-accent) 85%, transparent);
+  }
+
+  .btn-quiet {
+    background: transparent;
+    border-color: var(--color-rule);
+    color: var(--color-ink);
+  }
+
+  .btn-quiet:hover {
+    border-color: color-mix(in oklab, var(--color-ink) 40%, transparent);
+  }
+
+  /* Applies to input, select and textarea alike -- one look for every control
+     that takes typed or chosen input. */
+  .field {
+    display: block;
+    width: 100%;
+    border-radius: 0.375rem;
+    border: 1px solid var(--color-rule);
+    background: var(--color-plate);
+    color: var(--color-ink);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  .field:focus {
+    border-color: var(--color-accent);
+    outline: none;
+  }
+
+  .field::placeholder {
+    color: color-mix(in oklab, var(--color-muted) 60%, transparent);
+  }
+
+  .card {
+    background: var(--color-plate);
+    border: 1px solid var(--color-rule);
+    border-radius: 0.375rem;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--color-muted);
+  }
+
+  /* The segmented-control shell. Two partials use it: style-toggle.ejs
+     (toggle buttons, selected with aria-pressed) and theme-control.ejs
+     (radios, selected with aria-checked). */
+  .seg {
+    display: inline-flex;
+    border: 1px solid var(--color-rule);
+    border-radius: 0.375rem;
+    padding: 0.125rem;
+  }
+
+  .seg button {
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    color: var(--color-muted);
+  }
+
+  .seg button:hover {
+    color: var(--color-ink);
+  }
+
+  .seg button[aria-pressed="true"],
+  .seg button[aria-checked="true"] {
+    background: color-mix(in oklab, var(--color-ink) 10%, transparent);
+    color: var(--color-ink);
+  }
+
+  /* A frozen style-toggle disables every segment; this is the only cue that
+     the control (not just one segment) is unavailable. */
+  .seg button:disabled {
+    opacity: 0.55;
+  }
 }
 
 /*
@@ -126,7 +188,7 @@
  * gets that preference honored on top of this.
  *
  * Tailwind sizes type, spacing and max-widths in rem, so they all follow. Any
- * hardcoded px value does not — which is why this file and the templates avoid
+ * hardcoded px value does not, which is why this file and the templates avoid
  * them for anything that should scale.
  */
 html {
@@ -160,11 +222,10 @@ button:disabled,
 select {
   appearance: none;
   padding-right: 2.25rem;
-  /* %2394a3b8 is slate-400, hardcoded because a CSS variable cannot reach
-     inside a data URI. Left untouched rather than duplicated into a light
-     and dark copy: slate-400 is a mid-gray that reads clearly on both a
-     dark and a light field. */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394a3b8' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  /* %238a8778 is a mid warm gray, hardcoded because a CSS variable cannot
+     reach inside a data URI. One value for both themes: it reads clearly on
+     both a dark field and a light one. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%238a8778' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.7rem center;
   background-size: 1.1em 1.1em;
@@ -174,11 +235,8 @@ select {
 
    Its color comes from `color-scheme` (set at the top of this file), which is
    how the browser decides whether to draw the icon for a dark field or a light
-   one. There used to be a `filter: invert(0.75)` here, from before the page
-   declared a scheme: the browser drew the icon for a light page, and the filter
-   lightened it enough to see on a dark field. With the scheme declared, the
-   browser already draws the right icon for each theme, and the same filter
-   would invert that -- dark on the dark field, washed out on the light one. */
+   one. A `filter: invert()` here would invert the icon the browser already drew
+   for the active theme, leaving it dark on the dark field. */
 input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
   opacity: 0.85;
@@ -189,7 +247,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 input[type="date"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
-  background-color: color-mix(in oklab, var(--color-slate-400) 20%, transparent);
+  background-color: color-mix(in oklab, var(--color-muted) 20%, transparent);
 }
 
 /* Date fields also grow a vertical spinner on focus, which reads as a sort
@@ -232,10 +290,10 @@ textarea[data-autogrow] {
   margin: 0;
   width: 17rem;
   padding: 0.75rem;
-  border: 1px solid var(--color-slate-700);
+  border: 1px solid var(--color-rule);
   border-radius: 0.375rem;
-  background: var(--color-slate-900);
-  color: var(--color-slate-300);
+  background: var(--color-plate);
+  color: var(--color-ink);
   font-size: 0.75rem;
   font-weight: 400;
   line-height: 1.5;
@@ -257,7 +315,7 @@ textarea[data-autogrow] {
 
 .hint-popover code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--color-slate-400);
+  color: var(--color-muted);
 }
 
 /* Room under the page for the save bar while it shows. It is fixed to the
@@ -282,7 +340,10 @@ body:has([data-save-bar]:not([hidden])) main {
 
    The switch's distance is the bar's measured height, written to
    --save-bar-offset by public/js/unsaved.js the moment `hidden` changes,
-   which starts both transitions in the same frame. */
+   which starts both transitions in the same frame.
+
+   The bar is inverted in both themes (ink ground, paper text, warn dot) so
+   unsaved work reads as a distinct state instead of as more of the page. */
 :root {
   --save-bar-slide: 240ms cubic-bezier(0.2, 0, 0, 1);
 }
@@ -290,40 +351,7 @@ body:has([data-save-bar]:not([hidden])) main {
 [data-save-bar] {
   transform: translateY(0);
   transition: transform var(--save-bar-slide), display var(--save-bar-slide) allow-discrete;
-  /* Unlayered, so these win over the utility classes on the element (which
-     live in Tailwind's `utilities` layer) without touching save-bar.ejs.
-
-     In the light theme the bar is inverted: a dark slate bar on the dusty
-     page. A bar the page's color, or a shade or two off it, was lost against
-     the page on a bright display, and this bar exists to say that work is not
-     saved. In the dark theme each value resolves to what the classes already
-     produce: the page background and a translucent amber border. */
-  background-color: light-dark(oklch(27.9% 0.041 260), var(--color-slate-950));
-  border-top-color: light-dark(oklch(66.6% 0.179 58.318), color-mix(in oklab, var(--color-amber-900) 60%, transparent));
   box-shadow: 0 -6px 16px light-dark(rgb(15 23 42 / 0.08), transparent);
-}
-
-/* Text on the inverted bar. The classes in save-bar.ejs are tuned for a light
-   page in the light theme, which on a dark bar means dark text on dark, so in
-   light these take light colors from the dark end of the palette instead:
-   status 10.1:1 and Discard 9.9:1 against the bar. The hover rule is needed as
-   well as the plain one: an unlayered rule outranks any layered utility,
-   hover included, so without it Discard would stop brightening on hover. In
-   the dark theme all four resolve to the classes' own colors. */
-[data-save-bar] .text-amber-300 {
-  color: light-dark(oklch(87.9% 0.169 91.605), var(--color-amber-300));
-}
-
-[data-save-bar] .bg-amber-400 {
-  background-color: light-dark(oklch(82.8% 0.189 84.429), var(--color-amber-400));
-}
-
-[data-save-bar] .text-slate-400 {
-  color: light-dark(oklch(86.9% 0.022 252.894), var(--color-slate-400));
-}
-
-[data-save-bar] .hover\:text-slate-200:hover {
-  color: light-dark(oklch(92.9% 0.013 255.508), var(--color-slate-200));
 }
 
 [data-save-bar][hidden] {
@@ -357,7 +385,7 @@ body:has([data-save-bar]:not([hidden])) main {
 }
 
 .theme-switch:focus-visible {
-  outline: 2px solid var(--color-sky-600);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
@@ -367,15 +395,13 @@ body:has([data-save-bar]:not([hidden])) main {
   width: 2.75rem;
   height: 1.5rem;
   border-radius: 9999px;
-  background: var(--color-slate-800);
+  background: var(--color-rule);
 }
 
 .theme-switch[aria-checked="true"] .theme-switch-track {
-  /* Light theme showing. sky-600 is one of the two shades not redefined with
-     light-dark(), so the track is the same accent blue on either page. A
-     neutral track would sit too close to the light page and fields to read as
-     "on". */
-  background: var(--color-sky-600);
+  /* Light theme showing. Accent already reads correctly against either page
+     ground, so no fixed-shade special case is needed here anymore. */
+  background: var(--color-accent);
 }
 
 .theme-switch-knob {
@@ -385,8 +411,8 @@ body:has([data-save-bar]:not([hidden])) main {
   width: 1.125rem;
   height: 1.125rem;
   border-radius: 9999px;
-  background: var(--color-slate-100);
-  color: var(--color-slate-950);
+  background: var(--color-plate);
+  color: var(--color-ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -491,18 +517,18 @@ body:has([data-save-bar]:not([hidden])) main {
   justify-content: center;
   padding: 0;
   border: 0;
-  background: var(--color-slate-800);
-  color: var(--color-slate-400);
+  background: color-mix(in oklab, var(--color-ink) 10%, transparent);
+  color: var(--color-muted);
 }
 
 .stepper-buttons button:hover {
-  background: var(--color-slate-700);
-  color: var(--color-slate-200);
+  background: color-mix(in oklab, var(--color-ink) 16%, transparent);
+  color: var(--color-ink);
 }
 
 .stepper-buttons button:active {
-  background: var(--color-sky-600);
-  color: #fff;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 .stepper-buttons svg {

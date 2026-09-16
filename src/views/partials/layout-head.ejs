@@ -7,7 +7,7 @@
   <link rel="icon" href="<%= u('/favicon.svg') %>" type="image/svg+xml">
   <link rel="stylesheet" href="<%= u('/css/dist/app.css') %>">
 </head>
-<body class="h-full bg-slate-950 text-slate-200 antialiased">
+<body class="h-full bg-paper text-ink antialiased">
   <%
     // The chrome has slots, not modes. Whatever attached the request's store
     // fills them -- the demo says "this is a demo", a host says who is signed
@@ -20,7 +20,7 @@
     //   footer:   { text, mono, link: { href, label }, tail }
   %>
   <% if (locals.banner) { %>
-    <div class="border-b border-amber-900/60 bg-amber-950/40 text-amber-300">
+    <div class="border-b border-warn/30 bg-warn/10 text-warn">
       <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-2.5 text-sm">
         <p>
           <% if (banner.strong) { %><strong class="font-medium"><%= banner.strong %></strong><% } %>
@@ -30,7 +30,7 @@
           <form method="post" action="<%= u(banner.action.href) %>">
             <%- locals.csrfField?.() ?? '' %>
             <button type="submit"
-                    class="rounded border border-amber-800/70 px-2 py-1 text-xs text-amber-200 hover:bg-amber-900/40">
+                    class="rounded border border-warn/30 px-2 py-1 text-xs text-warn hover:bg-warn/20">
               <%= banner.action.label %>
             </button>
           </form>
@@ -38,9 +38,9 @@
       </div>
     </div>
   <% } %>
-  <header class="border-b border-slate-800">
+  <header class="border-b border-rule">
     <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-      <a href="<%= u('/') %>" class="flex items-center gap-2 text-sm font-semibold tracking-tight text-slate-100">
+      <a href="<%= u('/') %>" class="flex items-center gap-2 text-sm font-semibold tracking-tight text-ink">
         <!-- Inlined rather than <img src="<%= u('/favicon.svg') %>">, so the mark inherits
              currentColor and sizes in rem alongside the root scale. -->
         <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor"
@@ -50,7 +50,7 @@
         </svg>
         Invoisaurus
         <% if (locals.badge) { %>
-          <span class="rounded bg-amber-900/60 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-amber-300"><%= badge %></span>
+          <span class="rounded bg-warn/15 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-warn"><%= badge %></span>
         <% } %>
       </a>
       <nav class="flex items-center gap-5 text-sm">
@@ -60,17 +60,17 @@
         %>
         <% navItems.forEach(([href, label]) => { %>
           <a href="<%= u('/' + (href)) %>"
-             class="<%= section === href ? 'text-slate-100 font-medium' : 'text-slate-400 hover:text-slate-100' %>"
+             class="<%= section === href ? 'text-ink font-medium' : 'text-muted hover:text-ink' %>"
              <%- section === href ? 'aria-current="page"' : '' %>><%= label %></a>
         <% }) %>
         <% (locals.navRight || []).forEach((item) => { %>
           <% if (item.method === 'post') { %>
             <form method="post" action="<%= u(item.href) %>">
               <%- locals.csrfField?.() ?? '' %>
-              <button type="submit" class="text-slate-400 hover:text-slate-100"><%= item.label %></button>
+              <button type="submit" class="text-muted hover:text-ink"><%= item.label %></button>
             </form>
           <% } else { %>
-            <a href="<%= u(item.href) %>" class="text-slate-400 hover:text-slate-100"><%= item.label %></a>
+            <a href="<%= u(item.href) %>" class="text-muted hover:text-ink"><%= item.label %></a>
           <% } %>
         <% }) %>
       </nav>
@@ -81,7 +81,7 @@
       <%# data-flash: public/js/unsaved.js removes this once the form is edited,
           because the confirmation stops being true at that moment. %>
       <p role="status" data-flash
-         class="mb-6 rounded-md border border-emerald-900/60 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-300">
+         class="mb-6 rounded-md border border-ok/30 bg-ok/10 px-4 py-3 text-sm text-ok">
         <%= flash %>
       </p>
     <% } %>

@@ -8,25 +8,25 @@
       // number stays the thing you read first and the status rides above it.
       const badge = 'rounded-full border px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-widest';
     %>
-    <h1 class="flex items-start gap-2 text-2xl font-semibold tracking-tight text-slate-100">
+    <h1 class="flex items-start gap-2 text-2xl font-display font-medium tracking-tight text-ink">
       <%= isNew ? 'New Invoice' : invoice.id %>
       <% if (!isNew) { %>
         <span class="mt-1 <%= badge %> <%= statusBadgeClass(invoice.status) %>"><%= invoice.status %></span>
         <% if (isOverdue(invoice)) { %>
-          <span class="mt-1 <%= badge %> border-amber-800 bg-amber-950/70 text-amber-300">
+          <span class="mt-1 <%= badge %> border-warn/30 bg-warn/15 text-warn">
             <%= daysOverdue(invoice) %>d late
           </span>
         <% } %>
       <% } %>
     </h1>
-    <p class="mt-1 text-sm text-slate-500">
+    <p class="mt-1 text-sm text-faint">
       <%= invoice.billTo ? invoice.billTo.name : 'Unknown client' %>
     </p>
   </div>
   <% if (!isNew) { %>
     <div class="flex items-center gap-3">
       <a href="<%= u('/invoices/' + (invoice.id) + '/pdf?download=1') %>"
-         class="inline-flex items-center gap-2 rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:border-slate-500">
+         class="btn btn-quiet">
         Download PDF
         <svg viewBox="0 0 20 20" aria-hidden="true" class="h-4 w-4" fill="none" stroke="currentColor"
              stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -48,7 +48,7 @@
 
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
     <label class="block">
-      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Issued by</span>
+      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-muted">Issued by</span>
       <%# The vendor is choosable only while the invoice is being created. Its
           number already came out of this vendor's series and its remit-from
           block is already snapshotted, so switching it afterward would leave
@@ -56,38 +56,38 @@
           server ignores a submitted vendorId on an existing invoice; this
           keeps the page from offering a control that does nothing. %>
       <% if (isNew) { %>
-        <select name="vendorId" class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+        <select name="vendorId" class="field w-full">
           <% vendors.forEach((v) => { %>
             <option value="<%= v.id %>" <%= invoice.vendorId === v.id ? 'selected' : '' %>><%= v.name %></option>
           <% }) %>
         </select>
       <% } else { %>
-        <p class="rounded-md border border-slate-800/60 bg-slate-900/40 px-3 py-2 text-sm text-slate-400">
+        <p class="rounded-md border border-rule/60 bg-plate px-3 py-2 text-sm text-muted">
           <%= (vendors.find((v) => v.id === invoice.vendorId) || {}).name || invoice.vendorId %>
         </p>
       <% } %>
     </label>
     <%- field('issueDate', 'Invoice date', invoice.issueDate, { type: 'date' }) %>
     <label class="block">
-      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Terms</span>
-      <select name="terms" class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-muted">Terms</span>
+      <select name="terms" class="field w-full">
         <% TERMS.forEach((t) => { %>
           <option value="<%= t.id %>" <%= invoice.terms === t.id ? 'selected' : '' %>><%= t.label %></option>
         <% }) %>
       </select>
     </label>
     <label class="block">
-      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Payment due</span>
+      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-muted">Payment due</span>
       <input type="date" name="dueDate" value="<%= invoice.dueDate %>"
              data-overridden="<%= invoice.dueDate !== dueDateFor(invoice.issueDate, invoice.terms) %>"
-             class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
-      <p class="mt-1 text-xs text-slate-500">Follows terms until you change it.</p>
+             class="field w-full">
+      <p class="mt-1 text-xs text-faint">Follows terms until you change it.</p>
     </label>
   </div>
 
   <div>
     <table class="w-full text-sm">
-      <thead class="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
+      <thead class="border-b border-rule text-left text-xs uppercase tracking-wide text-faint">
         <tr>
           <th class="py-2 font-medium">
             <span class="inline-flex items-center gap-1.5">
@@ -101,27 +101,27 @@
           <th class="w-10 py-2"></th>
         </tr>
       </thead>
-      <tbody data-line-items class="divide-y divide-slate-900">
+      <tbody data-line-items class="divide-y divide-rule/60">
         <% invoice.lineItems.forEach((li, i) => { %>
           <tr data-line-item>
             <td class="py-2 pr-3">
               <textarea name="description[]" rows="1" data-autogrow
-                        class="w-full resize-none rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none"><%= li.description %></textarea>
+                        class="field w-full resize-none"><%= li.description %></textarea>
             </td>
             <td class="py-2 pr-3">
               <input name="quantity[]" type="number" step="any" min="0" inputmode="decimal" data-stepper data-step-amount="0.25" value="<%= quantityInputValue(li.quantityMilli) %>"
-                     class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-right text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+                     class="field w-full text-right">
             </td>
             <td class="py-2 pr-3">
               <input type="text" name="rate[]" inputmode="decimal" value="<%= centsInputValue(li.rateCents) %>"
-                     class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-right text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+                     class="field w-full text-right">
             </td>
-            <td class="py-2 text-right font-mono text-slate-300" data-amount>
+            <td class="py-2 text-right font-mono text-ink/80" data-amount>
               <%= totals.amounts[i] ? formatUSD(totals.amounts[i]) : '—' %>
             </td>
             <td class="py-2 text-right">
               <button type="button" data-remove title="Remove line" aria-label="Remove line item"
-                      class="rounded px-2 py-1 text-slate-600 hover:text-red-400 disabled:opacity-30 disabled:hover:text-slate-600">&times;</button>
+                      class="rounded px-2 py-1 text-muted/50 hover:text-danger disabled:opacity-30 disabled:hover:text-muted/50">&times;</button>
             </td>
           </tr>
         <% }) %>
@@ -130,13 +130,13 @@
         <tr>
           <td colspan="3" class="pt-4">
             <button type="button" data-add-row
-                    class="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:border-slate-500">
+                    class="btn btn-quiet px-3 py-1.5">
               Add line
             </button>
           </td>
           <td class="pt-4 text-right">
-            <div class="text-xs uppercase tracking-wide text-slate-500">Amount due</div>
-            <div class="font-mono text-lg text-slate-100" data-total><%= formatUSD(totals.totalCents) %></div>
+            <div class="text-xs uppercase tracking-wide text-faint">Amount due</div>
+            <div class="font-mono text-lg text-ink" data-total><%= formatUSD(totals.totalCents) %></div>
           </td>
           <td></td>
         </tr>
@@ -147,25 +147,25 @@
   <%# Not a wrapping <label>: a button is a labelable element, so a help button
       inside one would become the label's control instead of the textarea. %>
   <div class="max-w-2xl">
-    <div class="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+    <div class="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted">
       <label for="notes">Notes</label>
       <%- include('../partials/formatting-hint', { id: 'hint-notes' }) %>
     </div>
     <textarea id="notes" name="notes" rows="3" data-autogrow
-              class="w-full resize-none rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none"><%= invoice.notes %></textarea>
-    <p class="mt-1 text-xs text-slate-500">Optional. Prints at the bottom of the invoice.</p>
+              class="field w-full resize-none"><%= invoice.notes %></textarea>
+    <p class="mt-1 text-xs text-faint">Optional. Prints at the bottom of the invoice.</p>
   </div>
 
-  <div class="flex items-center gap-3 border-t border-slate-900 pt-6">
-    <button type="submit" class="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500">
+  <div class="flex items-center gap-3 border-t border-rule/60 pt-6">
+    <button type="submit" class="btn btn-primary">
       <%= isNew ? 'Create Invoice' : 'Save Changes' %>
     </button>
-    <a href="<%= u('/invoices') %>" class="text-sm text-slate-400 hover:text-slate-200">Cancel</a>
+    <a href="<%= u('/invoices') %>" class="text-sm text-muted hover:text-ink">Cancel</a>
     <% if (!isNew) { %>
       <span class="flex-1"></span>
-      <label class="text-xs uppercase tracking-wide text-slate-500">
+      <label class="text-xs uppercase tracking-wide text-faint">
         Status
-        <select name="status" class="ml-2 rounded-md border border-slate-800 bg-slate-900 px-2 py-1 text-xs text-slate-200 focus:border-sky-600 focus:outline-none">
+        <select name="status" class="field ml-2 px-2 py-1 text-xs">
           <% INVOICE_STATUSES.forEach((s) => { %>
             <option value="<%= s %>" <%= invoice.status === s ? 'selected' : '' %>><%= s %></option>
           <% }) %>
@@ -186,7 +186,7 @@
         data-delete-invoice="<%= invoice.id %>">
     <%- locals.csrfField?.() ?? '' %>
     <button type="submit"
-            class="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-red-400">
+            class="inline-flex items-center gap-1.5 text-xs text-muted/50 hover:text-danger">
       <svg viewBox="0 0 20 20" aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor"
            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3.5 5.5h13" />
@@ -204,20 +204,20 @@
   <tr data-line-item>
     <td class="py-2 pr-3">
       <textarea name="description[]" rows="1" data-autogrow
-                class="w-full resize-none rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none"></textarea>
+                class="field w-full resize-none"></textarea>
     </td>
     <td class="py-2 pr-3">
       <input name="quantity[]" type="number" step="any" min="0" inputmode="decimal" data-stepper data-step-amount="0.25"
-             class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-right text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+             class="field w-full text-right">
     </td>
     <td class="py-2 pr-3">
       <input type="text" name="rate[]" inputmode="decimal"
-             class="w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-right text-sm text-slate-100 focus:border-sky-600 focus:outline-none">
+             class="field w-full text-right">
     </td>
-    <td class="py-2 text-right font-mono text-slate-300" data-amount>—</td>
+    <td class="py-2 text-right font-mono text-ink/80" data-amount>—</td>
     <td class="py-2 text-right">
       <button type="button" data-remove title="Remove line" aria-label="Remove line item"
-              class="rounded px-2 py-1 text-slate-600 hover:text-red-400 disabled:opacity-30 disabled:hover:text-slate-600">&times;</button>
+              class="rounded px-2 py-1 text-muted/50 hover:text-danger disabled:opacity-30 disabled:hover:text-muted/50">&times;</button>
     </td>
   </tr>
 </template>
@@ -234,7 +234,7 @@
       }) %>
       <a href="<%= u('/invoices/' + (invoice.id) + '/pdf') %>" target="_blank" rel="noopener"
          title="Open the PDF in a new tab" aria-label="Open the PDF in a new tab"
-         class="rounded p-1.5 text-slate-500 hover:text-slate-200">
+         class="rounded p-1.5 text-faint hover:text-ink">
         <svg viewBox="0 0 20 20" aria-hidden="true" class="h-4 w-4" fill="none" stroke="currentColor"
              stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M11.5 4H16v4.5" /><path d="M16 4l-6.5 6.5" />
@@ -245,7 +245,7 @@
     <!-- The preview is the real PDF, not a second HTML rendering of the same
          data. There is nothing here that can drift from what the client gets. -->
     <iframe src="<%= u('/invoices/' + (invoice.id) + '/pdf#toolbar=0') %>" title="Invoice <%= invoice.id %>" data-pdf-preview
-            class="h-[56.25rem] w-full rounded-lg border border-slate-800 bg-slate-900"></iframe>
+            class="h-[56.25rem] w-full rounded-lg border border-rule bg-plate"></iframe>
   </section>
 <% } %>
 

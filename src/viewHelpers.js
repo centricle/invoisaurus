@@ -11,8 +11,9 @@ const escapeHtml = (value) => String(value ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-const INPUT_CLASS = 'w-full rounded-md border border-slate-800 bg-slate-900 px-3 py-2 '
-  + 'text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none';
+// The field's own look lives in the `.field` component (public/css/app.css);
+// every plain text input this helper builds is that component plus its width.
+const INPUT_CLASS = 'field w-full';
 
 const attr = (name, value) => (value == null ? '' : ` ${name}="${escapeHtml(value)}"`);
 
@@ -25,13 +26,13 @@ const attr = (name, value) => (value == null ? '' : ` ${name}="${escapeHtml(valu
 export function field(name, label, value, opts = {}) {
   const { type = 'text', hint, placeholder, className = '', min, max, stepper } = opts;
   return `<label class="block ${escapeHtml(className)}">
-  <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">${escapeHtml(label)}</span>
+  <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-muted">${escapeHtml(label)}</span>
   <input type="${escapeHtml(type)}" name="${escapeHtml(name)}" value="${escapeHtml(value)}"${
     attr('placeholder', placeholder)
   }${attr('min', min)}${attr('max', max)}${
     stepper == null ? '' : ` data-stepper data-step-amount="${escapeHtml(stepper)}"`
   } class="${INPUT_CLASS}">
-  ${hint ? `<p class="mt-1 text-xs text-slate-500">${escapeHtml(hint)}</p>` : ''}
+  ${hint ? `<p class="mt-1 text-xs text-faint">${escapeHtml(hint)}</p>` : ''}
 </label>`;
 }
 
@@ -48,10 +49,10 @@ export { escapeHtml };
  * text, so a class assembled at runtime is a class it never generates.
  */
 const STATUS_BADGE = {
-  draft: 'border-slate-700 bg-slate-800/70 text-slate-300',
-  sent: 'border-sky-800 bg-sky-950/70 text-sky-300',
-  paid: 'border-emerald-800 bg-emerald-950/70 text-emerald-300',
-  void: 'border-slate-800 bg-slate-900/70 text-slate-500 line-through',
+  draft: 'border-rule bg-ink/10 text-ink/80',
+  sent: 'border-accent/30 bg-accent/15 text-accent',
+  paid: 'border-ok/30 bg-ok/15 text-ok',
+  void: 'border-rule bg-plate text-faint line-through',
 };
 
 export const statusBadgeClass = (status) => STATUS_BADGE[status] || STATUS_BADGE.draft;

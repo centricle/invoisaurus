@@ -1,15 +1,15 @@
 <%- include('../partials/layout-head', { title: 'Invoices' }) %>
 
 <div class="mb-6 flex items-end justify-between">
-  <h1 class="text-2xl font-semibold tracking-tight text-slate-100">Invoices</h1>
-  <a href="<%= u('/invoices/new') %>" class="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500">New Invoice</a>
+  <h1 class="text-2xl font-display font-medium tracking-tight text-ink">Invoices</h1>
+  <a href="<%= u('/invoices/new') %>" class="btn btn-primary">New Invoice</a>
 </div>
 
 <% if (invoices.length || clientFilter || statusFilter) { %>
   <form method="get" action="<%= u('/invoices') %>" class="mb-8 flex flex-wrap items-end gap-3">
     <label class="block">
-      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Client</span>
-      <select name="client" class="rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-200 focus:border-sky-600 focus:outline-none">
+      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-faint">Client</span>
+      <select name="client" class="field">
         <option value="">All clients</option>
         <% clients.forEach((c) => { %>
           <option value="<%= c.id %>" <%= clientFilter === c.id ? 'selected' : '' %>><%= clientLabel(c) %></option>
@@ -17,37 +17,37 @@
       </select>
     </label>
     <label class="block">
-      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Status</span>
-      <select name="status" class="rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-200 focus:border-sky-600 focus:outline-none">
+      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-faint">Status</span>
+      <select name="status" class="field">
         <option value="">Any status</option>
         <% INVOICE_STATUSES.forEach((s) => { %>
           <option value="<%= s %>" <%= statusFilter === s ? 'selected' : '' %>><%= s %></option>
         <% }) %>
       </select>
     </label>
-    <button type="submit" class="rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500">Filter</button>
+    <button type="submit" class="btn btn-quiet">Filter</button>
     <% if (clientFilter || statusFilter) { %>
-      <a href="<%= u('/invoices') %>" class="py-2 text-sm text-slate-500 hover:text-slate-300">Clear</a>
+      <a href="<%= u('/invoices') %>" class="py-2 text-sm text-faint hover:text-ink/80">Clear</a>
     <% } %>
   </form>
 <% } %>
 
 <% if (!invoices.length && !unreadable.length) { %>
-  <div class="rounded-lg border border-dashed border-slate-800 px-6 py-16 text-center">
-    <p class="text-sm text-slate-400">
+  <div class="rounded-lg border border-dashed border-rule px-6 py-16 text-center">
+    <p class="text-sm text-muted">
       <%= clientFilter || statusFilter ? 'No invoices match that filter.' : 'No invoices yet.' %>
     </p>
     <%# Same order as the New Invoice flow: the vendor issues the number, so it
         is what is missing first on an install that skipped the seed. %>
     <% if (!vendors.length) { %>
-      <a href="<%= u('/vendors/new') %>" class="mt-3 inline-block text-sm text-sky-400 hover:underline">Add a vendor first</a>
+      <a href="<%= u('/vendors/new') %>" class="mt-3 inline-block text-sm text-accent hover:underline">Add a vendor first</a>
     <% } else if (!clients.length) { %>
-      <a href="<%= u('/clients/new') %>" class="mt-3 inline-block text-sm text-sky-400 hover:underline">Add a client first</a>
+      <a href="<%= u('/clients/new') %>" class="mt-3 inline-block text-sm text-accent hover:underline">Add a client first</a>
     <% } %>
   </div>
 <% } else { %>
   <table class="w-full text-sm">
-    <thead class="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
+    <thead class="border-b border-rule text-left text-xs uppercase tracking-wide text-faint">
       <tr>
         <th class="py-2 font-medium">Number</th>
         <th class="py-2 font-medium">Client</th>
@@ -57,15 +57,15 @@
         <th class="py-2 text-right font-medium">Amount</th>
       </tr>
     </thead>
-    <tbody class="divide-y divide-slate-900">
+    <tbody class="divide-y divide-rule/60">
       <% invoices.forEach((inv) => { %>
-        <tr class="hover:bg-slate-900/50">
+        <tr class="hover:bg-ink/5">
           <td class="py-3 font-mono">
-            <a href="<%= u('/invoices/' + (inv.id)) %>" class="text-sky-400 hover:underline"><%= inv.id %></a>
+            <a href="<%= u('/invoices/' + (inv.id)) %>" class="text-accent hover:underline"><%= inv.id %></a>
           </td>
           <td class="py-3"><%= inv.client ? clientLabel(inv.client) : (inv.billTo ? inv.billTo.name : '—') %></td>
-          <td class="py-3 text-slate-400"><%= inv.issueDate %></td>
-          <td class="py-3 <%= isOverdue(inv) ? 'text-amber-400' : 'text-slate-400' %>">
+          <td class="py-3 text-muted"><%= inv.issueDate %></td>
+          <td class="py-3 <%= isOverdue(inv) ? 'text-warn' : 'text-muted' %>">
             <%= inv.dueDate %>
             <% if (isOverdue(inv)) { %>
               <span class="ml-1 text-xs">· <%= daysOverdue(inv) %>d late</span>
@@ -74,29 +74,29 @@
           <td class="py-3">
             <span class="rounded-full border px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-widest <%= statusBadgeClass(inv.status) %>"><%= inv.status %></span>
           </td>
-          <td class="py-3 text-right font-mono <%= inv.status === 'sent' ? 'text-slate-100' : 'text-slate-600' %>"><%= formatUSD(inv.totalCents) %></td>
+          <td class="py-3 text-right font-mono <%= inv.status === 'sent' ? 'text-ink' : 'text-muted/50' %>"><%= formatUSD(inv.totalCents) %></td>
         </tr>
       <% }) %>
       <% unreadable.forEach((u) => { %>
-        <tr class="hover:bg-slate-900/50">
-          <td class="py-3 font-mono text-slate-400"><%= u.file %></td>
-          <td class="py-3 text-slate-500" colspan="3">
+        <tr class="hover:bg-ink/5">
+          <td class="py-3 font-mono text-muted"><%= u.file %></td>
+          <td class="py-3 text-faint" colspan="3">
             This file is in the invoices directory but could not be read. Repair or remove it.
           </td>
           <td class="py-3">
-            <span class="rounded-full border border-red-900 bg-red-950/60 px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-widest text-red-300">unreadable</span>
+            <span class="rounded-full border border-danger/30 bg-danger/10 px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-widest text-danger">unreadable</span>
           </td>
-          <td class="py-3 text-right font-mono text-slate-700">—</td>
+          <td class="py-3 text-right font-mono text-muted/35">—</td>
         </tr>
       <% }) %>
     </tbody>
     <tfoot>
-      <tr class="border-t border-slate-800">
-        <td colspan="4" class="pt-3 text-xs uppercase tracking-wide text-slate-500">
-          <%= invoices.length %> invoice<%= invoices.length === 1 ? '' : 's' %><% if (overdueCount) { %><span class="text-amber-400"> · <%= overdueCount %> overdue</span><% } %><% if (unreadable.length) { %><span class="text-red-400"> · <%= unreadable.length %> unreadable</span><% } %>
+      <tr class="border-t border-rule">
+        <td colspan="4" class="pt-3 text-xs uppercase tracking-wide text-faint">
+          <%= invoices.length %> invoice<%= invoices.length === 1 ? '' : 's' %><% if (overdueCount) { %><span class="text-warn"> · <%= overdueCount %> overdue</span><% } %><% if (unreadable.length) { %><span class="text-danger"> · <%= unreadable.length %> unreadable</span><% } %>
         </td>
-        <td class="pt-3 text-right text-xs uppercase tracking-wide text-slate-500">Outstanding</td>
-        <td class="pt-3 text-right font-mono text-slate-100"><%= formatUSD(outstandingCents) %></td>
+        <td class="pt-3 text-right text-xs uppercase tracking-wide text-faint">Outstanding</td>
+        <td class="pt-3 text-right font-mono text-ink"><%= formatUSD(outstandingCents) %></td>
       </tr>
     </tfoot>
   </table>

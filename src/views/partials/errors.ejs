@@ -1,8 +1,8 @@
 <% if (errors && errors.length) { %>
   <%# data-form-errors tells public/js/unsaved.js this page holds input the
       server refused, so it is unsaved from the moment it loads. %>
-  <div data-form-errors class="mb-6 rounded-md border border-red-900/60 bg-red-950/40 px-4 py-3">
-    <ul class="space-y-1 text-sm text-red-300">
+  <div data-form-errors class="mb-6 rounded-md border border-danger/30 bg-danger/10 px-4 py-3">
+    <ul class="space-y-1 text-sm text-danger">
       <% errors.forEach((e) => { %><li><%= e %></li><% }) %>
     </ul>
   </div>

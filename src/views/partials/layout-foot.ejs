@@ -24,7 +24,7 @@
   <script src="<%= u('/js/hint.js') %>" defer></script>
   <script src="<%= u('/js/unsaved.js') %>" defer></script>
   <script src="<%= u('/js/theme.js') %>" defer></script>
-  <footer class="mx-auto max-w-5xl px-6 pb-10 text-xs text-slate-600">
+  <footer class="mx-auto max-w-5xl px-6 pb-10 text-xs text-muted/50">
     <% if (locals.footer) { %>
       <% if (footer.mono) { %>
         <span class="font-mono"><%= footer.text %></span>
@@ -32,7 +32,7 @@
         <%= footer.text %>
       <% } %>
       <% if (footer.link) { %>
-        <a href="<%= footer.link.href %>" class="text-slate-500 underline hover:text-slate-300"><%= footer.link.label %></a>
+        <a href="<%= footer.link.href %>" class="text-faint underline hover:text-ink/80"><%= footer.link.label %></a>
       <% } %>
       <% if (footer.tail) { %><%= footer.tail %><% } %>
     <% } %>

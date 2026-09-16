@@ -22,16 +22,15 @@
   `discardHref` (app-relative).
 %>
 <div data-save-bar hidden role="region" aria-label="Unsaved changes"
-     class="fixed inset-x-0 bottom-0 z-40 border-t border-amber-900/60 bg-slate-950">
+     class="fixed inset-x-0 bottom-0 z-40 border-t border-warn/40 bg-ink text-paper">
   <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-6 py-3">
-    <p role="status" class="flex items-center gap-2 text-sm text-amber-300">
-      <span aria-hidden="true" class="h-2 w-2 rounded-full bg-amber-400"></span>
+    <p role="status" class="flex items-center gap-2 text-sm">
+      <span aria-hidden="true" class="h-2 w-2 rounded-full bg-warn"></span>
       Unsaved changes
     </p>
     <div class="flex items-center gap-4">
-      <a href="<%= u(discardHref) %>" data-discard class="text-sm text-slate-400 hover:text-slate-200">Discard</a>
-      <button type="submit" form="<%= form %>"
-              class="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500"><%= label %></button>
+      <a href="<%= u(discardHref) %>" data-discard class="text-sm text-paper/80 hover:text-paper">Discard</a>
+      <button type="submit" form="<%= form %>" class="btn btn-primary"><%= label %></button>
     </div>
   </div>
 </div>
