@@ -315,7 +315,12 @@ test('an invoice that fails validation does not burn a number', async () => {
   });
 
   assert.equal(res.status, 422);
-  assert.match(await res.text(), /needs at least one line item/);
+  const body = await res.text();
+  assert.match(body, /needs at least one line item/);
+  // The snapshot is only taken at save, so the re-rendered form has no billTo;
+  // the subheading names the chosen client anyway.
+  assert.match(body, /Wile E\. Coyote/, "the client's name survives the re-render");
+  assert.doesNotMatch(body, /Unknown client/);
   assert.equal((await store.getVendor(vendor.id)).nextNumber, 1, 'the counter did not move');
   assert.deepEqual(await store.listInvoices(), [], 'and nothing was written');
 });

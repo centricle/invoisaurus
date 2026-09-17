@@ -20,7 +20,9 @@
       <% } %>
     </h1>
     <p class="mt-1 text-sm text-faint">
-      <%= invoice.billTo ? invoice.billTo.name : 'Unknown client' %>
+      <%# billTo is the snapshot taken at save; before that (a new invoice, or a
+          422 re-render of one) the name comes from the chosen client. %>
+      <%= invoice.billTo?.name ?? clients.find((c) => c.id === invoice.clientId)?.name ?? 'Unknown client' %>
     </p>
   </div>
   <% if (!isNew) { %>
