@@ -266,18 +266,19 @@ nothing. `src/csrf.js` has the mechanism.
 
 ### Light and dark
 
-The interface has a light theme and a dark one. On a first visit it follows the
-operating system's setting. The switch at the bottom right of the screen (moon
-on the left for dark, sun on the right for light) switches to the other theme
-and remembers the choice in a `theme` cookie, which the server reads so the
-next page arrives in that theme instead of painting the other one first. The
-PDF is not themed: an invoice prints the same whichever theme it was previewed
-in.
+The interface has a light theme and a dark one. A three-way control in the
+footer picks dark, system or light. System follows the operating system's
+setting and is the default. A choice is kept in a `theme` cookie, which the
+server reads so the next page arrives in that theme instead of painting the
+other one first. The PDF is not themed: an invoice prints the same whichever
+theme it was previewed in.
 
-The light theme is not a second set of classes in the templates.
-`public/css/app.css` redefines Tailwind's color variables with `light-dark()`,
-so a class like `bg-slate-950` is the page background in both themes, and
-`test/theme.test.js` fails if a template uses a color that has no light value.
+The light theme is not a second set of classes in the templates. Colors are
+semantic tokens in `public/css/app.css` (`paper`, `ink`, `accent` and so on),
+each a `light-dark()` pair, and views use classes like `bg-paper` and
+`text-ink`. `test/theme.test.js` fails if a view uses a fixed Tailwind palette
+color instead, since that color would not change with the theme. To restyle,
+see "Theming" under "Use as a package".
 
 ### Two styles
 

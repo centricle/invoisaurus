@@ -566,31 +566,46 @@ test('a cookie that cannot be percent-decoded does not take the page down', asyn
   assert.ok(!html.includes('data-theme'));
 });
 
-test('the page renders a theme switch outside the header, with the state a cookie implies', async () => {
+test('the page renders a three-state theme control in the footer, with the state a cookie implies', async () => {
   const noCookie = await (await fetch(`${base}/invoices`)).text();
-  const button = /<button[^>]*data-theme-toggle[^>]*>/.exec(noCookie);
-  assert.ok(button, 'public/js/theme.js finds the switch by data-theme-toggle');
+  const group = /<div[^>]*data-theme-control[^>]*>/.exec(noCookie);
+  assert.ok(group, 'public/js/theme.js finds the control by data-theme-control');
   // Attributes checked individually rather than as one fixed string, so the
   // test does not depend on the order they are written in the template.
-  assert.match(button[0], /role="switch"/);
-  assert.match(button[0], /type="button"/, 'not a submit button, so it never posts a form');
-  assert.match(button[0], /aria-label="Light theme"/, 'names what "on" means; aria-checked carries the state');
+  assert.match(group[0], /role="radiogroup"/);
+  assert.match(group[0], /aria-label="Theme"/);
   // The script scopes the cookie it writes to this path. It comes from the
   // app's mount point, so an app served under a prefix does not set a cookie
   // for the whole site around it; this test app has no prefix, hence '/'.
-  assert.match(button[0], /data-cookie-path="\/"/);
+  assert.match(group[0], /data-cookie-path="\/"/);
 
   const headerEnd = noCookie.indexOf('</header>') + '</header>'.length;
   assert.ok(headerEnd > '</header>'.length, 'sanity check: found </header> in the page');
   assert.ok(
-    noCookie.slice(headerEnd).includes('data-theme-toggle'),
-    'the switch comes after </main>, last in tab order, not inside the header nav',
+    noCookie.slice(headerEnd).includes('data-theme-control'),
+    'the control lives in the footer, not the header nav',
   );
 
-  for (const [cookie, checked] of [['theme=light', 'true'], ['theme=dark', 'false'], ['', 'false']]) {
+  const radios = (body) => [...body.matchAll(/<button[^>]*role="radio"[^>]*>/g)].map((m) => m[0]);
+
+  for (const [cookie, checkedValue] of [['theme=light', 'light'], ['theme=dark', 'dark'], ['', '']]) {
     const body = await (await fetch(`${base}/invoices`, { headers: cookie ? { cookie } : {} })).text();
-    const b = /<button[^>]*data-theme-toggle[^>]*>/.exec(body)[0];
-    assert.match(b, new RegExp(`aria-checked="${checked}"`), `cookie ${JSON.stringify(cookie)}`);
+    const buttons = radios(body);
+    assert.equal(buttons.length, 3, `cookie ${JSON.stringify(cookie)}: dark, system and light segments`);
+    for (const button of buttons) {
+      const value = /data-theme-value="([^"]*)"/.exec(button)[1];
+      const expected = value === checkedValue;
+      assert.match(
+        button,
+        new RegExp(`aria-checked="${expected}"`),
+        `cookie ${JSON.stringify(cookie)}, segment ${JSON.stringify(value)}`,
+      );
+      assert.match(
+        button,
+        new RegExp(`tabindex="${expected ? '0' : '-1'}"`),
+        `roving tabindex follows aria-checked for segment ${JSON.stringify(value)}`,
+      );
+    }
   }
 });
 

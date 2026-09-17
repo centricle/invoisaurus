@@ -1,6 +1,7 @@
 <%- include('partials/layout-head', { title: 'Not found' }) %>
 <div class="rounded-lg border border-dashed border-rule px-6 py-16 text-center">
-  <p class="text-sm text-muted"><%= what %> not found.</p>
-  <a href="<%= u('/') %>" class="mt-3 inline-block text-sm text-accent hover:underline">Back to invoices</a>
+  <h1 class="font-display text-xl font-medium tracking-tight text-ink"><%= what %> not found.</h1>
+  <p class="mt-2 text-sm text-muted">Check the address, or head back to the invoice list.</p>
+  <a href="<%= u('/') %>" class="btn btn-quiet mt-4">Back to invoices</a>
 </div>
 <%- include('partials/layout-foot') %>

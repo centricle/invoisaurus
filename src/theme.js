@@ -2,7 +2,8 @@
  * Which theme the reader chose, if they chose one.
  *
  * The interface follows the operating system's light or dark setting until the
- * reader clicks the toggle in the header. That choice is kept in a cookie, not
+ * reader picks dark or light in the footer's theme control; picking "system"
+ * clears the choice again. That choice is kept in a cookie, not
  * in localStorage, because the server has to know it before the page is sent:
  * the layout renders it as `data-theme` on `<html>`, and a page that learned
  * the theme from script after loading would paint in the other one first.

@@ -7,7 +7,21 @@
   <link rel="icon" href="<%= u('/favicon.svg') %>" type="image/svg+xml">
   <link rel="apple-touch-icon" href="<%= u('/apple-touch-icon.png') %>">
   <link rel="icon" type="image/png" href="<%= u('/apple-touch-icon.png') %>" sizes="180x180">
+  <%# The two families/weights used above the fold on first paint -- the rest
+      render below it or on demand, and font-display: swap already lets them
+      wait. Every page carries these, host and slot content alike. %>
+  <link rel="preload" as="font" type="font/woff2" href="<%= u('/fonts/fraunces.woff2') %>" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="<%= u('/fonts/alegreya-sans-400.woff2') %>" crossorigin>
+  <%# Sets data-theme from the theme cookie before first paint, for a page that
+      includes this partial but is not rendered by this app and so has no
+      src/theme.js to set the attribute server-side. On the engine itself this
+      does nothing: the attribute is already rendered above, from
+      res.locals.theme (src/theme.js). This app's CSP (src/csrf.js) covers only
+      the PDF route's frame-ancestors, so it does not block an inline script; a
+      host that adds a CSP needs a hash or nonce for this tag. %>
+  <script>(function(){var m=document.cookie.match(/(?:^|; )theme=(light|dark)/);if(m&&!document.documentElement.dataset.theme)document.documentElement.dataset.theme=m[1]})();</script>
   <link rel="stylesheet" href="<%= u('/css/dist/app.css') %>">
+  <%- locals.head ?? '' %>
 </head>
 <body class="h-full bg-paper text-ink antialiased">
   <%
@@ -19,7 +33,9 @@
     //   banner:   { strong, text, action: { href, label } }   action posts, app-relative
     //   badge:    text beside the wordmark
     //   navRight: [{ href, label, method }]                 method 'post' renders a button
-    //   footer:   { text, mono, link: { href, label }, tail }
+    //   footer:   { text, mono, link: { href, label }, tail, links: [{ href, label }] }
+    //   head:     raw HTML for the document head: preloads, analytics, meta
+    //   emptyActions: [{ href, label, method, note }]   invoices-empty-state only; method 'post' renders a button
   %>
   <% if (locals.banner) { %>
     <div class="border-b border-warn/30 bg-warn/10 text-warn">
@@ -41,15 +57,18 @@
     </div>
   <% } %>
   <header class="border-b border-rule">
-    <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+    <%# Both rows wrap: at phone width the nav drops under the wordmark rather
+        than pushing the page wider than the viewport. Five links fit two
+        lines at 390px, which beats hiding an app's primary nav in a menu. %>
+    <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-4">
       <a href="<%= u('/') %>" class="flex items-center gap-2 font-display text-lg font-medium tracking-tight text-ink">
         <%- include('marks/stego', { class: 'h-6 w-6' }) %>
         Invoisaurus
         <% if (locals.badge) { %>
-          <span class="rounded bg-warn/15 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-warn"><%= badge %></span>
+          <span class="eyebrow rounded bg-warn/15 px-1.5 py-0.5 text-warn"><%= badge %></span>
         <% } %>
       </a>
-      <nav class="flex items-center gap-5 text-sm">
+      <nav class="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
         <%
           const section = (locals.currentPath || '/').split('/')[1] || 'invoices';
           const navItems = [['invoices', 'Invoices'], ['clients', 'Clients'], ['vendors', 'Vendors']];

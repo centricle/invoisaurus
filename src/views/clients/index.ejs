@@ -10,6 +10,7 @@
     <p class="text-sm text-muted">No clients yet.</p>
   </div>
 <% } else { %>
+  <div class="overflow-x-auto">
   <table class="w-full text-sm">
     <thead class="border-b border-rule text-left text-xs uppercase tracking-wide text-faint">
       <tr>
@@ -34,6 +35,7 @@
       <% }) %>
     </tbody>
   </table>
+  </div>
 <% } %>
 
 <%- include('../partials/layout-foot') %>

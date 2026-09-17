@@ -1,0 +1,34 @@
+<%#
+  Theme control: an icon-only segmented radiogroup (dark / system / light),
+  in the footer's ordinary document flow. public/js/theme.js drives clicks
+  and arrow-key roving; public/css/app.css's .theme-control styles it on top
+  of .seg. A host that renders its own pages can include this partial.
+
+  The server renders aria-checked and the roving tabindex from the theme
+  cookie (src/theme.js), so nothing is corrected after first paint.
+
+  Takes `theme` ('light', 'dark', or '' for system) and `cookiePath`
+  (app-relative; where the theme cookie is scoped -- see src/app.js).
+%>
+<%
+  const THEME_OPTIONS = [
+    ['dark', 'Dark', 'moon'],
+    ['', 'System', 'sun-moon'],
+    ['light', 'Light', 'sun'],
+  ];
+  const currentTheme = locals.theme || '';
+  const themeCookiePath = locals.cookiePath || '/';
+%>
+<div class="seg theme-control" role="radiogroup" aria-label="Theme"
+     data-theme-control data-cookie-path="<%= themeCookiePath %>">
+  <% THEME_OPTIONS.forEach(([value, label, icon]) => {
+    const checked = currentTheme === value;
+  %>
+    <button type="button" role="radio" aria-checked="<%= checked %>"
+            data-theme-value="<%= value %>" title="<%= label %>"
+            tabindex="<%= checked ? '0' : '-1' %>">
+      <%- include('icons/' + icon, { class: 'h-4 w-4' }) %>
+      <span class="sr-only"><%= label %></span>
+    </button>
+  <% }) %>
+</div>

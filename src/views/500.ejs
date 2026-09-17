@@ -1,15 +1,15 @@
 <%- include('partials/layout-head', { title: 'Something broke' }) %>
 <div class="rounded-lg border border-dashed border-danger/30 px-6 py-16 text-center">
-  <p class="text-sm text-ink/80">Something broke while building this page.</p>
+  <h1 class="font-display text-xl font-medium tracking-tight text-ink">Something broke.</h1>
   <%# The exception text is deliberately not printed here. It carries the
       absolute path of whatever file it was reading, which puts a home directory
       and a username into a page that gets screenshotted -- the same reason the
       footer shows the data directory home-relative. The terminal running the
       server has the whole thing, stack included. %>
-  <p class="mt-2 text-xs text-faint">
+  <p class="mt-2 text-sm text-muted">
     The details are in the terminal running the server. A damaged file in the
     data directory is the usual cause.
   </p>
-  <a href="<%= u('/') %>" class="mt-4 inline-block text-sm text-accent hover:underline">Back to invoices</a>
+  <a href="<%= u('/') %>" class="btn btn-quiet mt-4">Back to invoices</a>
 </div>
 <%- include('partials/layout-foot') %>
