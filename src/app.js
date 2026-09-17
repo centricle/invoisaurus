@@ -41,6 +41,13 @@ import { invoicesRouter } from './routes/invoices.js';
  * @param {object|Function|null} [options.store] The store a request gets when
  *   nothing earlier in the chain attached one: an instance, or `(req, res) =>
  *   store`. Null when `middleware` always supplies it.
+ * @param {string[]} [options.assets] Directories served as static files ahead
+ *   of the engine's own `public/`. The first directory with the requested file
+ *   answers, so a host's file at the same path as an engine file wins, and
+ *   anything the host lacks falls through to the engine. A host that builds
+ *   its own stylesheet from `invoisaurus/css` (its views add classes the
+ *   engine's build never saw) serves it at `/css/dist/app.css` this way; a
+ *   favicon or mark it overrides works the same.
  * @param {Function[]} [options.middleware] Run after static files and before
  *   anything that reads or writes records. This is where a request gets its
  *   store (`req.store`), and where the chrome slots on `res.locals` -- `banner`,
@@ -61,6 +68,7 @@ import { invoicesRouter } from './routes/invoices.js';
 export function createApp({
   basePath = '',
   store = null,
+  assets = [],
   middleware = [],
   locals = {},
   allowOrigins = [],
@@ -79,6 +87,7 @@ export function createApp({
   // number; stating it makes it a decision rather than a default, now that the
   // form is reachable by anyone.
   app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+  for (const dir of assets) app.use(base || '/', express.static(dir));
   app.use(base || '/', express.static(PUBLIC_DIR));
 
   // Helpers every view needs. Kept in one place so no template reimplements money

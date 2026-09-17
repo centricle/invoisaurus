@@ -39,6 +39,7 @@
     "./flash": "./src/flash.js",
     "./paths": "./src/paths.js",
     "./testing": "./test/store-contract.js",
+    "./css": "./public/css/app.css",
     "./package.json": "./package.json"
   },
   "files": [

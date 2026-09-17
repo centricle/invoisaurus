@@ -469,10 +469,11 @@ await store.ensureDataDir();
 const app = createApp({
   store,                     // or attach req.store in middleware, per request
   basePath: '',              // or '/etc/invoisaurus'
+  assets: [],                // static roots served ahead of the engine's public/
   middleware: [],            // runs after static files, before the routers
   home: true,                // GET / redirects to the invoice list
   allowOrigins: [],          // proxies a browser may post from
-  locals: {},                // defaults for the chrome: banner, badge, navRight, footer
+  locals: {},                // defaults for the chrome: banner, badge, navRight, footer, head, emptyActions
   mount(app, { u }) {},      // extra routes, added before the 404 handler
 });
 app.listen(7054, '127.0.0.1');
@@ -488,10 +489,17 @@ synchronously underneath, so a store that has to wait on a database is a
 drop-in rather than a rewrite of every caller.
 
 **The chrome has slots, not modes.** Middleware sets `res.locals.banner`,
-`badge`, `navRight`, `footer` and `watermark` per request, in the shapes
-documented at the top of `src/views/partials/layout-head.ejs`, and the layout
-renders what it is given. That is how the demo says "this is a demo" and how a
-host says who is signed in, from one set of templates.
+`badge`, `navRight`, `footer`, `watermark`, `head` and `emptyActions` per
+request, in the shapes documented at the top of `src/views/partials/layout-head.ejs`,
+and the layout renders what it is given. That is how the demo says "this is a
+demo" and how a host says who is signed in, from one set of templates. `head`
+is raw HTML dropped just before `</head>` -- preloads, analytics, a meta tag --
+and `footer.links` (`[{ href, label }]`) adds quiet links (Terms, Privacy) next
+to the footer's own text without a copy of the file. `emptyActions` (`[{ href,
+label, method, note }]`) adds a second action to the invoices list's empty
+state below "New Invoice", for something like "Load sample data"; `method:
+'post'` renders a CSRF-guarded button, anything else a plain link, and `note`
+is a line of muted text under it.
 
 **Two things a bundler cannot see.** The templates and the Modern style's font
 files are read at runtime, so a serverless bundle has to carry them: list
@@ -499,9 +507,36 @@ files are read at runtime, so a serverless bundle has to carry them: list
 in `included_files`, and set `INVOISAURUS_ROOT` to the package directory inside
 the bundle, exactly as `netlify/demo-env.js` does for the demo. A host that
 keeps the fonts elsewhere passes a loader to `configureFonts` from
-`invoisaurus/fonts` instead. The stylesheet is generated, not shipped: build it
-from `public/css/app.css` with the Tailwind CLI, pointing `@source` at both
-sets of templates.
+`invoisaurus/fonts` instead. The stylesheet itself is covered next.
+
+### Theming
+
+A host imports `invoisaurus/css` from its own Tailwind entry point rather than
+copying `public/css/app.css` or reimplementing the palette. Every color is a
+role -- `paper`, `plate`, `ink`, `rule`, `muted`, `faint`, `accent`,
+`on-accent`, `ok`, `warn`, `danger` -- declared once as a `light-dark()` pair,
+plus `font-display`, `font-sans` and `font-mono`. Overriding one means
+declaring that same `@theme` variable again, after the import: Tailwind takes
+the last declaration, and a single `light-dark()` value replaces both the
+light and the dark side of the token at once, so there is no separate dark-mode
+override to keep in sync.
+
+```css
+@import "tailwindcss";
+@import "invoisaurus/css";
+@source "../../node_modules/invoisaurus/src/views";
+@theme {
+  --color-accent: light-dark(oklch(40.4% 0.112 23.6), oklch(73.4% 0.104 36.6));
+}
+```
+
+The `@source` line matters as much as the import: Tailwind only generates the
+utility classes it finds referenced in a scanned file, and a host's own pages
+rarely use every class the engine's views do (`border-warn/40`, say). Without
+it, those utilities are missing from the host's build even though the token
+they reference exists -- point `@source` at `node_modules/invoisaurus/src/views`
+(adjusted for wherever the host's own CSS entry file lives) so the engine's
+templates are scanned too.
 
 The rest of the surface -- `invoisaurus/schema`, `/money`, `/markup`, `/import`, `/pdf`,
 `/demo`, `/seed`, `/fixtures`, `/csrf`, `/flash`, `/cookies`, `/paths` -- is
