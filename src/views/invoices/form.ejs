@@ -164,7 +164,7 @@
       <span class="flex-1"></span>
       <label class="text-xs uppercase tracking-wide text-faint">
         Status
-        <select name="status" class="field ml-2 px-2 py-1 text-xs">
+        <select name="status" class="field ml-2 inline-block w-auto px-2 py-1 text-xs">
           <% INVOICE_STATUSES.forEach((s) => { %>
             <option value="<%= s %>" <%= invoice.status === s ? 'selected' : '' %>><%= s %></option>
           <% }) %>
