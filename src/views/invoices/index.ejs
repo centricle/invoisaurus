@@ -90,7 +90,7 @@
           <td class="py-3">
             <span class="rounded-full border px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-widest <%= statusBadgeClass(inv.status) %>"><%= inv.status %></span>
           </td>
-          <td class="py-3 text-right font-mono <%= inv.status === 'sent' ? 'text-ink' : 'text-muted/50' %>"><%= formatUSD(inv.totalCents) %></td>
+          <td class="py-3 text-right font-mono <%= inv.status === 'sent' ? 'text-ink' : 'text-faint' %>"><%= formatUSD(inv.totalCents) %></td>
         </tr>
       <% }) %>
       <% unreadable.forEach((u) => { %>
@@ -102,7 +102,7 @@
           <td class="py-3">
             <span class="rounded-full border border-danger/30 bg-danger/10 px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-widest text-danger">unreadable</span>
           </td>
-          <td class="py-3 text-right font-mono text-muted/35">—</td>
+          <td class="py-3 text-right font-mono text-faint">—</td>
         </tr>
       <% }) %>
     </tbody>

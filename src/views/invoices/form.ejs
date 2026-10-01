@@ -120,7 +120,7 @@
             </td>
             <td class="py-2 text-right">
               <button type="button" data-remove title="Remove line" aria-label="Remove line item"
-                      class="rounded px-2 py-1 text-muted/50 hover:text-danger disabled:opacity-30 disabled:hover:text-muted/50">&times;</button>
+                      class="rounded px-2 py-1 text-faint hover:text-danger disabled:opacity-30 disabled:hover:text-faint">&times;</button>
             </td>
           </tr>
         <% }) %>
@@ -185,7 +185,7 @@
         data-delete-invoice="<%= invoice.id %>">
     <%- locals.csrfField?.() ?? '' %>
     <button type="submit"
-            class="inline-flex items-center gap-1.5 text-xs text-muted/50 hover:text-danger">
+            class="inline-flex items-center gap-1.5 text-xs text-faint hover:text-danger">
       <%- include('../partials/icons/trash-2', { class: 'h-3.5 w-3.5' }) %>
       Delete this invoice
     </button>
@@ -210,7 +210,7 @@
     <td class="py-2 text-right font-mono text-ink/80" data-amount>—</td>
     <td class="py-2 text-right">
       <button type="button" data-remove title="Remove line" aria-label="Remove line item"
-              class="rounded px-2 py-1 text-muted/50 hover:text-danger disabled:opacity-30 disabled:hover:text-muted/50">&times;</button>
+              class="rounded px-2 py-1 text-faint hover:text-danger disabled:opacity-30 disabled:hover:text-faint">&times;</button>
     </td>
   </tr>
 </template>

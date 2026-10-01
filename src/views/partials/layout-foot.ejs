@@ -3,7 +3,7 @@
   <script src="<%= u('/js/hint.js') %>" defer></script>
   <script src="<%= u('/js/unsaved.js') %>" defer></script>
   <script src="<%= u('/js/theme.js') %>" defer></script>
-  <footer class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 pb-10 text-xs text-muted/60">
+  <footer class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 pb-10 text-xs text-faint">
     <div>
       <% if (locals.footer) { %>
         <% if (footer.mono) { %>
@@ -16,7 +16,7 @@
         <% } %>
         <% if (footer.tail) { %><%= footer.tail %><% } %>
         <% (footer.links || []).forEach((link) => { %>
-          <a href="<%= link.href %>" class="ml-3 text-muted/60 hover:text-ink"><%= link.label %></a>
+          <a href="<%= link.href %>" class="ml-3 text-faint hover:text-ink"><%= link.label %></a>
         <% }) %>
       <% } %>
     </div>
