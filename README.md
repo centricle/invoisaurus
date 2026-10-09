@@ -544,7 +544,7 @@ the same modules the local tool is made of, under the names in `package.json`.
 
 ## License
 
-[AGPL-3.0-only](./LICENSE), from 2.0.0. Copyright 2026 Kevin Smith.
+[AGPL-3.0-only](./LICENSE), from 2.0.0. Copyright 2026 Centricle LLC.
 
 Versions 1.x were released under MIT and remain so; the tags carry their own
 license file. The change protects the one thing MIT does not: someone can run
